@@ -58,7 +58,8 @@ async def main_async():
 
     bounds = load_bounds()
 
-    async def ws_handler(ws, path):
+    # Accept either (websocket, path) or just (websocket,) depending on websockets version
+    async def ws_handler(ws, path=None):
         await handler(ws, path, controller, vm, bounds)
 
     server = await websockets.serve(ws_handler, '0.0.0.0', 8765)
