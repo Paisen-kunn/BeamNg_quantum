@@ -52,6 +52,7 @@ export default function App() {
   const h = window.innerHeight;
 
   const [vehicles, setVehicles] = useState({});
+  const [optimisedRoutes, setOptimisedRoutes] = useState({});
   const [viewMode, setViewMode] = useState('full'); // 'full' or 'minimap'
 
   useEffect(() => {
@@ -68,6 +69,9 @@ export default function App() {
               map[v.id] = v;
             }
             setVehicles(map);
+            if (data.optimised_routes) {
+              setOptimisedRoutes(data.optimised_routes);
+            }
           }
         } catch (e) {
           console.warn('Invalid WS message', e);
@@ -151,6 +155,23 @@ export default function App() {
                 </g>
               );
             })}
+          {/* highlight optimised route for player if available */}
+          {(() => {
+            const ids = Object.keys(vehicles);
+            if (ids.length === 0) return null;
+            const playerId = ids.find((id) => id.toLowerCase().includes('player')) || ids[0];
+            const chosen = optimisedRoutes[playerId];
+            if (!chosen) return null;
+            // chosen is array of polyline indices
+            return chosen.map((pli) => {
+              const pl = mapData.polylines[pli];
+              if (!pl) return null;
+              const pts = pointsToStr(pl.points);
+              return (
+                <polyline key={`opt-${pli}`} points={pts} fill="none" stroke="#16a34a" strokeWidth={Math.max(0.004, strokeWidth * 10)} strokeLinecap="round" strokeLinejoin="round" opacity={0.95} />
+              );
+            });
+          })()}
           {/* find main player (id contains 'player' or fallback to first) */}
           {(() => {
             const ids = Object.keys(vehicles);
