@@ -18,8 +18,8 @@ export default function MapScreen() {
     : 1;
 
   const imgWidth = width;
-  // make the map cover full device height to fill the screen
-  const imgHeight = height;
+  // preserve original level aspect ratio to avoid vertical stretching
+  const imgHeight = Math.max(300, Math.round(width * aspect));
 
   // gesture / animation state
   const translateX = useSharedValue(0);
@@ -68,7 +68,8 @@ export default function MapScreen() {
   return (
     <ThemedView style={styles.container}>
       <GestureDetector gesture={composed}>
-        <AnimatedView style={[styles.mapCanvas, { width: imgWidth, height: imgHeight, flex: 1 }, animatedStyle]}>
+        <View style={styles.centerContainer} pointerEvents="box-none">
+          <AnimatedView style={[styles.mapCanvas, { width: imgWidth, height: imgHeight }, animatedStyle]}>
           <Svg width={imgWidth} height={imgHeight}>
             {/* grid */}
             {Array.from({ length: tileCols + 1 }).map((_, i) => (
@@ -142,7 +143,8 @@ export default function MapScreen() {
               </Pressable>
             </View>
           )}
-        </AnimatedView>
+          </AnimatedView>
+        </View>
       </GestureDetector>
     </ThemedView>
   );
@@ -150,6 +152,7 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   mapCanvas: { backgroundColor: '#f8fafc', overflow: 'hidden' },
   marker: {
     position: 'absolute',
