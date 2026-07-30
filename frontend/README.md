@@ -14,6 +14,27 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 
    ```bash
    npx expo start
+
+## Map setup
+
+This project includes a new `map` tab using `react-native-maps`.
+
+1. Install the new dependency from the `frontend` folder:
+
+```bash
+cd frontend
+npm install
+```
+
+2. On Android, to use Google Maps with the native provider you may need to add a Google Maps API key in `android/app/src/main/AndroidManifest.xml` for bare or dev builds. For Expo-managed projects, follow the `react-native-maps` and Expo documentation for configuring Google Maps.
+
+3. Start the app and open the `Map` tab in the bottom navigation:
+
+```bash
+npx expo start
+```
+
+If you need help adding an API key or enabling native Google Maps, tell me your target (Expo Go, development build, or bare) and I will add the exact steps.
    ```
 
 In the output, you'll find options to open the app in a
