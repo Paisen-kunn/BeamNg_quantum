@@ -51,6 +51,10 @@ export default function App() {
   const w = window.innerWidth;
   const h = window.innerHeight;
 
+  // stroke width scales inversely with zoom so inner/core lines become thinner when zoomed in
+  const baseStroke = 0.02; // viewBox units
+  const strokeWidth = Math.max(0.002, baseStroke / Math.max(0.0001, state.scale));
+
   return (
     <div
       ref={containerRef}
@@ -81,7 +85,7 @@ export default function App() {
                 points={pointsToStr(pl.points)}
                 fill="none"
                 stroke="#1e40af"
-                strokeWidth="0.02"
+                strokeWidth={strokeWidth}
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
