@@ -52,8 +52,9 @@ export default function App() {
   const h = window.innerHeight;
 
   // stroke width scales inversely with zoom so inner/core lines become thinner when zoomed in
-  const baseStroke = 0.02; // viewBox units
-  const strokeWidth = Math.max(0.002, baseStroke / Math.max(0.0001, state.scale));
+  // Use much smaller base and minimum values so lines render thin like Google map roads
+  const baseStroke = 0.004; // viewBox units (reduced)
+  const strokeWidth = Math.max(0.0005, baseStroke / Math.max(0.0001, state.scale));
 
   return (
     <div
