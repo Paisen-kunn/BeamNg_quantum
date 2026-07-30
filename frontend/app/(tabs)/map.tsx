@@ -9,7 +9,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 const AnimatedView = Animated.createAnimatedComponent(View);
 
 export default function MapScreen() {
-  const { width } = Dimensions.get('window');
+  const { width, height } = Dimensions.get('window');
 
   // compute aspect from bounds when available to preserve level proportions
   const bounds = (mapData && mapData.bounds) || null;
@@ -18,7 +18,8 @@ export default function MapScreen() {
     : 1;
 
   const imgWidth = width;
-  const imgHeight = Math.max(300, Math.round(width * aspect));
+  // make the map cover full device height to fill the screen
+  const imgHeight = height;
 
   // gesture / animation state
   const translateX = useSharedValue(0);
@@ -67,7 +68,7 @@ export default function MapScreen() {
   return (
     <ThemedView style={styles.container}>
       <GestureDetector gesture={composed}>
-        <AnimatedView style={[styles.mapCanvas, { width: imgWidth, height: imgHeight }, animatedStyle]}>
+        <AnimatedView style={[styles.mapCanvas, { width: imgWidth, height: imgHeight, flex: 1 }, animatedStyle]}>
           <Svg width={imgWidth} height={imgHeight}>
             {/* grid */}
             {Array.from({ length: tileCols + 1 }).map((_, i) => (
