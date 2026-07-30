@@ -100,6 +100,10 @@ export default function App() {
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseUp}
     >
+      <div className="map-controls">
+        <button onClick={() => setState(s => ({ ...s, scale: Math.min(s.scale * 1.25, 8) }))}>+</button>
+        <button onClick={() => setState(s => ({ ...s, scale: Math.max(s.scale / 1.25, 0.2) }))}>−</button>
+      </div>
       <div
         className="svg-wrapper"
         style={{
@@ -119,17 +123,31 @@ export default function App() {
           </defs>
           <rect x="0" y="0" width="1" height="1" fill="url(#grid)" />
           {mapData.polylines &&
-            mapData.polylines.map((pl, i) => (
-              <polyline
-                key={i}
-                points={pointsToStr(pl.points)}
-                fill="none"
-                stroke="#1e40af"
-                strokeWidth={strokeWidth}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            ))}
+            mapData.polylines.map((pl, i) => {
+              const pts = pointsToStr(pl.points);
+              const baseWidth = Math.max(0.002, strokeWidth * 6);
+              return (
+                <g key={i}>
+                  <polyline
+                    points={pts}
+                    fill="none"
+                    stroke="#f4d35e"
+                    strokeWidth={baseWidth}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={0.95}
+                  />
+                  <polyline
+                    points={pts}
+                    fill="none"
+                    stroke="#2b6cb0"
+                    strokeWidth={strokeWidth}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </g>
+              );
+            })}
           {Object.values(vehicles).map((v) => (
             <circle key={v.id} cx={v.nx} cy={v.ny} r={0.01 / state.scale} fill="rgba(220,38,38,0.95)" stroke="#fff" strokeWidth={0.001} />
           ))}
