@@ -174,11 +174,9 @@ export default function App() {
                   <circle key={v.id} cx={v.nx} cy={v.ny} r={0.009 / state.scale} fill="rgba(220,38,38,0.95)" stroke="#fff" strokeWidth={0.0008} />
                 ))}
 
-                {/* player icon: green dot */}
+                {/* player icon: same size as other vehicles (green) */}
                 {player && (
-                  <g transform={`translate(${player.nx}, ${player.ny}) scale(${iconScale})`}>
-                    <circle cx={0} cy={0} r={1} fill="#16a34a" stroke="#fff" strokeWidth={0.08} />
-                  </g>
+                  <circle key={player.id} cx={player.nx} cy={player.ny} r={0.009 / state.scale} fill="#16a34a" stroke="#fff" strokeWidth={0.0008} />
                 )}
               </g>
             );
