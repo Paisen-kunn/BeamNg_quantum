@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import mapData from '../../assets/map_data.json';
+import preview from '../../assets/map_preview.png';
 
 export default function App() {
   const containerRef = useRef(null);
@@ -53,8 +54,8 @@ export default function App() {
 
   // stroke width scales inversely with zoom so inner/core lines become thinner when zoomed in
   // Use much smaller base and minimum values so lines render thin like Google map roads
-  const baseStroke = 0.004; // viewBox units (reduced)
-  const strokeWidth = Math.max(0.0005, baseStroke / Math.max(0.0001, state.scale));
+  const baseStroke = 0.0004; // viewBox units (reduced)
+  const strokeWidth = Math.max(0.00005, baseStroke / Math.max(0.0001, state.scale));
 
   return (
     <div
@@ -68,7 +69,15 @@ export default function App() {
     >
       <div
         className="svg-wrapper"
-        style={{ width: w, height: h, transform: `translate(${state.tx}px, ${state.ty}px) scale(${state.scale})` }}
+        style={{
+          width: w,
+          height: h,
+          transform: `translate(${state.tx}px, ${state.ty}px) scale(${state.scale})`,
+          backgroundImage: `url(${preview})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
       >
         <svg viewBox="0 0 1 1" preserveAspectRatio="xMidYMid meet" width={w} height={h}>
           {/* grid */}
