@@ -1,0 +1,14 @@
+html, body, #root { height: 100%; margin: 0; }
+.dashboard-root {
+  width: 100vw;
+  height: 100vh;
+  background: #ffffff;
+  overflow: hidden;
+  cursor: grab;
+}
+.dashboard-root:active { cursor: grabbing; }
+.svg-wrapper {
+  transform-origin: 0 0;
+}
+
+svg { display: block; }
