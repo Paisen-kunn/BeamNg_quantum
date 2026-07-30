@@ -1,6 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
 import mapData from '../../assets/map_data.json';
-import preview from '../../assets/map_preview.png';
 
 export default function App() {
   const containerRef = useRef(null);
@@ -73,10 +72,7 @@ export default function App() {
           width: w,
           height: h,
           transform: `translate(${state.tx}px, ${state.ty}px) scale(${state.scale})`,
-          backgroundImage: `url(${preview})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
+          backgroundColor: '#fbfdff',
         }}
       >
         <svg viewBox="0 0 1 1" preserveAspectRatio="xMidYMid meet" width={w} height={h}>
