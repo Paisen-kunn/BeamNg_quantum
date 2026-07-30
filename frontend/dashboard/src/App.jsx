@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import mapData from '../../assets/map_data.json';
 
 export default function App() {
@@ -52,46 +52,6 @@ export default function App() {
   const h = window.innerHeight;
 
   const [vehicles, setVehicles] = useState({});
-  const canvasRef = useRef(null);
-
-  // Build graph stats (node degrees & polyline lengths) and classify roads
-  const roadInfo = useMemo(() => {
-    const nodeKey = (p) => `${p.nx.toFixed(4)},${p.ny.toFixed(4)}`;
-    const nodeCount = new Map();
-    const polylines = mapData.polylines || [];
-    for (const pl of polylines) {
-      for (const pt of pl.points) {
-        const k = nodeKey(pt);
-        nodeCount.set(k, (nodeCount.get(k) || 0) + 1);
-      }
-    }
-
-    const infos = polylines.map((pl) => {
-      // compute normalized length
-      let len = 0;
-      for (let i = 1; i < pl.points.length; i++) {
-        const a = pl.points[i - 1];
-        const b = pl.points[i];
-        const dx = a.nx - b.nx;
-        const dy = a.ny - b.ny;
-        len += Math.sqrt(dx * dx + dy * dy);
-      }
-      // degree average
-      let degSum = 0;
-      for (const p of pl.points) {
-        degSum += nodeCount.get(nodeKey(p)) || 0;
-      }
-      const avgDeg = degSum / Math.max(1, pl.points.length);
-      // heuristic classification
-      let type = 'minor';
-      if (len > 0.18 || avgDeg >= 3) type = 'major';
-      else if (len > 0.06 || avgDeg >= 2.0) type = 'secondary';
-
-      return { len, avgDeg, type, points: pl.points };
-    });
-
-    return infos;
-  }, []);
 
   useEffect(() => {
     let ws;
@@ -130,39 +90,6 @@ export default function App() {
   const baseStroke = 0.0004; // viewBox units (reduced)
   const strokeWidth = Math.max(0.00005, baseStroke / Math.max(0.0001, state.scale));
 
-  // draw base rasterized roads to canvas for performance
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    // background
-    ctx.fillStyle = '#fbfdff';
-    ctx.fillRect(0, 0, w, h);
-
-    // draw road bases
-    for (const info of roadInfo) {
-      const pts = info.points;
-      // choose color and width by type
-      let color = '#f4d35e';
-      let lineWidth = (info.type === 'major' ? 18 : info.type === 'secondary' ? 10 : 5);
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lineWidth;
-      ctx.beginPath();
-      for (let i = 0; i < pts.length; i++) {
-        const x = pts[i].nx * w;
-        const y = pts[i].ny * h;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    }
-  // redraw when size or roadInfo changes
-  }, [w, h, roadInfo]);
-
   return (
     <div
       ref={containerRef}
@@ -186,9 +113,7 @@ export default function App() {
           backgroundColor: '#fbfdff',
         }}
       >
-        {/* raster base canvas */}
-        <canvas ref={canvasRef} style={{ width: w, height: h, position: 'absolute', left: 0, top: 0 }} />
-        <svg viewBox="0 0 1 1" preserveAspectRatio="xMidYMid meet" width={w} height={h} style={{ position: 'absolute', left: 0, top: 0 }}>
+        <svg viewBox="0 0 1 1" preserveAspectRatio="xMidYMid meet" width={w} height={h}>
           {/* grid */}
           <defs>
             <pattern id="grid" width="0.25" height="0.25" patternUnits="objectBoundingBox">
@@ -197,39 +122,68 @@ export default function App() {
             </pattern>
           </defs>
           <rect x="0" y="0" width="1" height="1" fill="url(#grid)" />
-          {/* centerlines (SVG) drawn above canvas base for crispness */}
-          {roadInfo &&
-            roadInfo.map((info, i) => {
-              const pts = info.points;
-              const ptsStr = pointsToStr(pts);
-              // centerline color and width by type
-              let centerColor = '#2b6cb0';
-              let centerWidth = strokeWidth * (info.type === 'major' ? 1.6 : info.type === 'secondary' ? 1.2 : 1.0);
+          {mapData.polylines &&
+            mapData.polylines.map((pl, i) => {
+              const pts = pointsToStr(pl.points);
+              const baseWidth = Math.max(0.002, strokeWidth * 6);
               return (
-                <polyline
-                  key={i}
-                  points={ptsStr}
-                  fill="none"
-                  stroke={centerColor}
-                  strokeWidth={centerWidth}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+                <g key={i}>
+                  <polyline
+                    points={pts}
+                    fill="none"
+                    stroke="#f4d35e"
+                    strokeWidth={baseWidth}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={0.95}
+                  />
+                  <polyline
+                    points={pts}
+                    fill="none"
+                    stroke="#2b6cb0"
+                    strokeWidth={strokeWidth}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </g>
               );
             })}
+          {/* find main player (id contains 'player' or fallback to first) */}
+          {(() => {
+            const ids = Object.keys(vehicles);
+            if (ids.length === 0) return null;
+            const playerId = ids.find((id) => id.toLowerCase().includes('player')) || ids[0];
+            const player = vehicles[playerId];
+            const others = ids.filter((id) => id !== playerId).map((id) => vehicles[id]);
 
-          {/* POI labels */}
-          {mapData.points && mapData.points.slice(0, 80).map((p, idx) => (
-            <g key={`poi-${idx}`}>
-              <circle cx={p.nx} cy={p.ny} r={0.006 / state.scale} fill="#ef4444" stroke="#fff" strokeWidth={0.001} />
-              <text x={p.nx + 0.007} y={p.ny + 0.003} fontSize={0.02} fill="#0f172a">{p.x ? `POI` : 'POI'}</text>
-            </g>
-          ))}
+            const iconScale = 0.035 / Math.max(0.5, state.scale);
 
-          {/* vehicles */}
-          {Object.values(vehicles).map((v) => (
-            <circle key={v.id} cx={v.nx} cy={v.ny} r={0.01 / state.scale} fill="rgba(220,38,38,0.95)" stroke="#fff" strokeWidth={0.001} />
-          ))}
+            // compute heading angle (deg) if direction available
+            let angle = 0;
+            if (player && player.dir && Array.isArray(player.dir)) {
+              const dx = player.dir[0];
+              const dy = player.dir[1];
+              // map game dir to screen angle: atan2(dx, -dy)
+              angle = (Math.atan2(dx, -dy) * 180) / Math.PI;
+            }
+
+            return (
+              <g>
+                {/* other vehicles as small dots */}
+                {others.map((v) => (
+                  <circle key={v.id} cx={v.nx} cy={v.ny} r={0.009 / state.scale} fill="rgba(220,38,38,0.95)" stroke="#fff" strokeWidth={0.0008} />
+                ))}
+
+                {/* player icon */}
+                {player && (
+                  <g transform={`translate(${player.nx}, ${player.ny}) rotate(${angle}) scale(${iconScale})`}>
+                    <circle cx={0} cy={0} r={1} fill="#2b8afc" />
+                    <path d="M0 -0.6 L0.4 0.6 L0 0.2 L-0.4 0.6 Z" fill="#fff" transform="scale(0.9)" />
+                  </g>
+                )}
+              </g>
+            );
+          })()}
         </svg>
       </div>
     </div>
