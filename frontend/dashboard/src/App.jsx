@@ -10,9 +10,17 @@ export default function App() {
     const w = window.innerWidth;
     const h = window.innerHeight;
     const imgW = w;
-    const imgH = Math.max(300, Math.round(w * ((mapData.bounds?.maxy - mapData.bounds?.miny) / Math.max(1e-6, mapData.bounds?.maxx - mapData.bounds?.minx) || 1)));
+    const imgH = Math.max(
+      300,
+      Math.round(
+        w *
+          ((mapData.bounds?.maxy - mapData.bounds?.miny) /
+            Math.max(1e-6, mapData.bounds?.maxx - mapData.bounds?.minx) ||
+            1)
+      )
+    );
     const cover = Math.max(w / imgW, h / imgH);
-    setState((s) => ({ ...s, scale: Math.max(1, cover) }));
+    setState((s) => ({ ...s, scale: Math.max(1, cover), tx: 0, ty: 0 }));
   }, []);
 
   function onWheel(e) {
@@ -40,6 +48,9 @@ export default function App() {
 
   const pointsToStr = (pts) => pts.map((p) => `${p.nx},${p.ny}`).join(' ');
 
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
   return (
     <div
       ref={containerRef}
@@ -52,9 +63,9 @@ export default function App() {
     >
       <div
         className="svg-wrapper"
-        style={{ transform: `translate(${state.tx}px, ${state.ty}px) scale(${state.scale})` }}
+        style={{ width: w, height: h, transform: `translate(${state.tx}px, ${state.ty}px) scale(${state.scale})` }}
       >
-        <svg viewBox="0 0 1 1" preserveAspectRatio="xMidYMid meet" width={window.innerWidth} height={window.innerHeight}>
+        <svg viewBox="0 0 1 1" preserveAspectRatio="xMidYMid meet" width={w} height={h}>
           {/* grid */}
           <defs>
             <pattern id="grid" width="0.25" height="0.25" patternUnits="objectBoundingBox">
@@ -63,9 +74,18 @@ export default function App() {
             </pattern>
           </defs>
           <rect x="0" y="0" width="1" height="1" fill="url(#grid)" />
-          {mapData.polylines && mapData.polylines.map((pl, i) => (
-            <polyline key={i} points={pointsToStr(pl.points)} fill="none" stroke="#1e40af" strokeWidth="0.005" strokeLinecap="round" strokeLinejoin="round" />
-          ))}
+          {mapData.polylines &&
+            mapData.polylines.map((pl, i) => (
+              <polyline
+                key={i}
+                points={pointsToStr(pl.points)}
+                fill="none"
+                stroke="#1e40af"
+                strokeWidth="0.02"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ))}
         </svg>
       </div>
     </div>
