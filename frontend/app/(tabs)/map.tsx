@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Dimensions, Pressable, Text } from 'react-native';
 import { ThemedView } from '@/components/themed-view';
 import mapData from '@/assets/map_data.json';
@@ -20,6 +20,9 @@ export default function MapScreen() {
   const imgWidth = width;
   // preserve original level aspect ratio to avoid vertical stretching
   const imgHeight = Math.max(300, Math.round(width * aspect));
+
+  // compute initial 'cover' scale to make the map fill the screen (no letterbox)
+  const coverScale = Math.max(width / imgWidth, height / imgHeight);
 
   // gesture / animation state
   const translateX = useSharedValue(0);
@@ -61,6 +64,17 @@ export default function MapScreen() {
     };
   });
 
+  // apply initial cover scale and center the map so it fills the screen without black bars
+  useEffect(() => {
+    const initial = Math.max(1, coverScale);
+    const tx = (width - imgWidth * initial) / 2;
+    const ty = (height - imgHeight * initial) / 2;
+    scale.value = withTiming(initial, { duration: 200 });
+    translateX.value = withTiming(tx, { duration: 200 });
+    translateY.value = withTiming(ty, { duration: 200 });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [width, height]);
+
   // tile-like grid: draw lines every quarter width/height (visual aid for zoom)
   const tileCols = 4;
   const tileRows = Math.max(1, Math.round(tileCols * aspect));
@@ -68,8 +82,13 @@ export default function MapScreen() {
   return (
     <ThemedView style={styles.container}>
       <GestureDetector gesture={composed}>
-        <View style={styles.centerContainer} pointerEvents="box-none">
-          <AnimatedView style={[styles.mapCanvas, { width: imgWidth, height: imgHeight }, animatedStyle]}>
+        <AnimatedView
+          style={[
+            styles.mapCanvas,
+            { width: imgWidth, height: imgHeight },
+            animatedStyle,
+          ]}
+        >
           <Svg width={imgWidth} height={imgHeight}>
             {/* grid */}
             {Array.from({ length: tileCols + 1 }).map((_, i) => (
@@ -144,16 +163,21 @@ export default function MapScreen() {
             </View>
           )}
           </AnimatedView>
-        </View>
       </GestureDetector>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#fff', overflow: 'hidden' },
   centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  mapCanvas: { backgroundColor: '#f8fafc', overflow: 'hidden' },
+  mapCanvas: {
+    backgroundColor: '#f8fafc',
+    overflow: 'hidden',
+    position: 'absolute',
+    left: 0,
+    top: 0,
+  },
   marker: {
     position: 'absolute',
     width: 16,
