@@ -51,6 +51,40 @@ export default function App() {
   const w = window.innerWidth;
   const h = window.innerHeight;
 
+  const [vehicles, setVehicles] = useState({});
+
+  useEffect(() => {
+    let ws;
+    try {
+      ws = new WebSocket('ws://localhost:8765');
+      ws.onopen = () => console.log('Connected to live map server');
+      ws.onmessage = (ev) => {
+        try {
+          const data = JSON.parse(ev.data);
+          if (data.type === 'positions') {
+            const map = {};
+            for (const v of data.vehicles) {
+              map[v.id] = v;
+            }
+            setVehicles(map);
+          }
+        } catch (e) {
+          console.warn('Invalid WS message', e);
+        }
+      };
+      ws.onclose = () => console.log('WS closed');
+      ws.onerror = (err) => console.warn('WS error', err);
+    } catch (e) {
+      console.warn('Could not connect to WS', e);
+    }
+
+    return () => {
+      try {
+        ws && ws.close();
+      } catch (e) {}
+    };
+  }, []);
+
   // stroke width scales inversely with zoom so inner/core lines become thinner when zoomed in
   // Use much smaller base and minimum values so lines render thin like Google map roads
   const baseStroke = 0.0004; // viewBox units (reduced)
@@ -96,6 +130,9 @@ export default function App() {
                 strokeLinejoin="round"
               />
             ))}
+          {Object.values(vehicles).map((v) => (
+            <circle key={v.id} cx={v.nx} cy={v.ny} r={0.01 / state.scale} fill="rgba(220,38,38,0.95)" stroke="#fff" strokeWidth={0.001} />
+          ))}
         </svg>
       </div>
     </div>
