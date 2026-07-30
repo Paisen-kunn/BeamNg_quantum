@@ -41,10 +41,16 @@ class VehicleManager:
             vx, vy, vz = state["vel"]
             speed = math.sqrt(vx ** 2 + vy ** 2 + vz ** 2)
 
+            # Include rotation/heading when available (may be None)
+            rot = state.get('rot') if isinstance(state, dict) else None
+            direction = state.get('dir') if isinstance(state, dict) else None
+
             traffic_data.append({
                 "id": vehicle_id,
                 "position": state["pos"],
-                "speed": speed
+                "speed": speed,
+                "rot": rot,
+                "dir": direction,
             })
 
         return traffic_data
