@@ -174,11 +174,10 @@ export default function App() {
                   <circle key={v.id} cx={v.nx} cy={v.ny} r={0.009 / state.scale} fill="rgba(220,38,38,0.95)" stroke="#fff" strokeWidth={0.0008} />
                 ))}
 
-                {/* player icon */}
+                {/* player icon: green dot */}
                 {player && (
-                  <g transform={`translate(${player.nx}, ${player.ny}) rotate(${angle}) scale(${iconScale})`}>
-                    <circle cx={0} cy={0} r={1} fill="#2b8afc" />
-                    <path d="M0 -0.6 L0.4 0.6 L0 0.2 L-0.4 0.6 Z" fill="#fff" transform="scale(0.9)" />
+                  <g transform={`translate(${player.nx}, ${player.ny}) scale(${iconScale})`}>
+                    <circle cx={0} cy={0} r={1} fill="#16a34a" stroke="#fff" strokeWidth={0.08} />
                   </g>
                 )}
               </g>
