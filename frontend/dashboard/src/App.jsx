@@ -52,6 +52,7 @@ export default function App() {
   const h = window.innerHeight;
 
   const [vehicles, setVehicles] = useState({});
+  const [viewMode, setViewMode] = useState('full'); // 'full' or 'minimap'
 
   useEffect(() => {
     let ws;
@@ -103,6 +104,8 @@ export default function App() {
       <div className="map-controls">
         <button onClick={() => setState(s => ({ ...s, scale: Math.min(s.scale * 1.25, 8) }))}>+</button>
         <button onClick={() => setState(s => ({ ...s, scale: Math.max(s.scale / 1.25, 0.2) }))}>−</button>
+        <button onClick={() => setViewMode('full')} style={{ marginLeft: 8, background: viewMode === 'full' ? '#e6eefc' : undefined }}>Full</button>
+        <button onClick={() => setViewMode('minimap')} style={{ marginLeft: 4, background: viewMode === 'minimap' ? '#e6eefc' : undefined }}>Minimap</button>
       </div>
       <div
         className="svg-wrapper"
@@ -182,6 +185,41 @@ export default function App() {
             );
           })()}
         </svg>
+        {/* minimap overlay when requested */}
+        {viewMode === 'minimap' && (() => {
+          const ids = Object.keys(vehicles);
+          if (ids.length === 0) return null;
+          const playerId = ids.find((id) => id.toLowerCase().includes('player')) || ids[0];
+          const player = vehicles[playerId];
+          if (!player) return null;
+
+          const minimapPx = 220;
+          const worldSize = 0.18; // world units shown in minimap (square)
+          const cx = player.nx;
+          const cy = player.ny;
+          const minx = cx - worldSize / 2;
+          const miny = cy - worldSize / 2;
+          const r = worldSize * 0.035;
+
+          return (
+            <div style={{ position: 'absolute', right: 16, top: 16, width: minimapPx, height: minimapPx, borderRadius: 8, overflow: 'hidden', boxShadow: '0 6px 18px rgba(0,0,0,0.18)', pointerEvents: 'none', background: '#fff' }}>
+              <svg viewBox={`${minx} ${miny} ${worldSize} ${worldSize}`} width={minimapPx} height={minimapPx} preserveAspectRatio="xMidYMid meet">
+                <rect x={minx} y={miny} width={worldSize} height={worldSize} fill="#fbfdff" />
+                {mapData.polylines && mapData.polylines.map((pl, i) => (
+                  <polyline key={i} points={pointsToStr(pl.points)} fill="none" stroke="#f4d35e" strokeWidth={worldSize * 0.02} strokeLinecap="round" strokeLinejoin="round" opacity={0.95} />
+                ))}
+                {mapData.polylines && mapData.polylines.map((pl, i) => (
+                  <polyline key={`inner-${i}`} points={pointsToStr(pl.points)} fill="none" stroke="#2b6cb0" strokeWidth={worldSize * 0.003} strokeLinecap="round" strokeLinejoin="round" />
+                ))}
+
+                {/* other vehicles */}
+                {Object.values(vehicles).map((v) => (
+                  <circle key={v.id} cx={v.nx} cy={v.ny} r={r} fill={v.id === playerId ? '#16a34a' : 'rgba(220,38,38,0.95)'} stroke="#fff" strokeWidth={worldSize * 0.005} />
+                ))}
+              </svg>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
