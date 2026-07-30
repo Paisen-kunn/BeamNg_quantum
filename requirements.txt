@@ -1,0 +1,4 @@
+dwave-ocean-sdk>=1.0
+dimod>=0.10
+dwave-system>=1.0
+neal>=0.6
