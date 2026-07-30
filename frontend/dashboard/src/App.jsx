@@ -102,10 +102,10 @@ export default function App() {
       onMouseLeave={onMouseUp}
     >
       <div className="map-controls">
-        <button onClick={() => setState(s => ({ ...s, scale: Math.min(s.scale * 1.25, 8) }))}>+</button>
-        <button onClick={() => setState(s => ({ ...s, scale: Math.max(s.scale / 1.25, 0.2) }))}>−</button>
-        <button onClick={() => setViewMode('full')} style={{ marginLeft: 8, background: viewMode === 'full' ? '#e6eefc' : undefined }}>Full</button>
-        <button onClick={() => setViewMode('minimap')} style={{ marginLeft: 4, background: viewMode === 'minimap' ? '#e6eefc' : undefined }}>Minimap</button>
+        <button className="icon" onClick={() => setState(s => ({ ...s, scale: Math.min(s.scale * 1.25, 8) }))}>+</button>
+        <button className="icon" onClick={() => setState(s => ({ ...s, scale: Math.max(s.scale / 1.25, 0.2) }))}>−</button>
+        <button onClick={() => setViewMode('full')} style={{ marginLeft: 0, background: viewMode === 'full' ? '#e6eefc' : undefined }}>Full</button>
+        <button onClick={() => setViewMode('minimap')} style={{ marginLeft: 0, background: viewMode === 'minimap' ? '#e6eefc' : undefined }}>Minimap</button>
       </div>
       <div
         className="svg-wrapper"
