@@ -15,7 +15,8 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarButton: HapticTab,
-      }}>
+      }}
+      initialRouteName="map">
       <Tabs.Screen
         name="index"
         options={{
