@@ -69,7 +69,24 @@ async def main_async():
 
     # simple optimiser task: every few seconds build candidate paths and solve QUBO
     async def optimiser_task():
-        solver = DWaveSolverWrapper(use_dwave=False)
+        # configure D-Wave usage from environment
+        use_dwave = os.environ.get('DWAVE_USE_HW', '0') in ('1', 'true', 'True')
+        sampler_params = {}
+        # optional annealing params
+        at = os.environ.get('DWAVE_ANNEALING_TIME')
+        if at:
+            try:
+                sampler_params['annealing_time'] = float(at)
+            except Exception:
+                pass
+        nsrt = os.environ.get('DWAVE_NUM_SPIN_REVERSAL')
+        if nsrt:
+            try:
+                sampler_params['num_spin_reversal_transforms'] = int(nsrt)
+            except Exception:
+                pass
+
+        solver = DWaveSolverWrapper(use_dwave=use_dwave, sampler_params=sampler_params)
         while True:
             try:
                 traffic = vm.get_vehicle_data()

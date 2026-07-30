@@ -18,29 +18,40 @@ except Exception:
     dimod = None
 
 class DWaveSolverWrapper:
-    def __init__(self, use_dwave=True):
+    def __init__(self, use_dwave=True, sampler_params=None):
         self.use_dwave = use_dwave
+        self.sampler_params = sampler_params or {}
 
     def _to_bqm(self, qubo: Dict[Tuple[int,int], float]):
         if dimod is None:
             return None
-        # dimod expects QUBO with var labels; our qubo uses integer indices
         return dimod.BinaryQuadraticModel.from_qubo(qubo)
 
     def sample_qubo(self, qubo: Dict[Tuple[int,int], float], num_reads: int = 100):
         bqm = self._to_bqm(qubo)
-        # Try D-Wave hardware
+
+        # Try D-Wave hardware sampler (with EmbeddingComposite) or hybrid sampler
         if self.use_dwave:
             try:
-                from dwave.system import DWaveSampler, EmbeddingComposite
-                sampler = EmbeddingComposite(DWaveSampler())
-                sampleset = sampler.sample_qubo({k: v for k, v in qubo.items()}, num_reads=num_reads)
-                # convert to standard dict
-                best = sampleset.first
-                return {'sample': dict(best.sample), 'energy': float(best.energy), 'source': 'dwave'}
+                from dwave.system import DWaveSampler, EmbeddingComposite, LeapHybridSampler
+                # Prefer D-Wave QPU when available
+                try:
+                    sampler = EmbeddingComposite(DWaveSampler())
+                    params = {**self.sampler_params}
+                    params.setdefault('num_reads', num_reads)
+                    sampleset = sampler.sample_qubo({k: v for k, v in qubo.items()}, **params)
+                    best = sampleset.first
+                    return {'sample': dict(best.sample), 'energy': float(best.energy), 'source': 'dwave_qpu'}
+                except Exception:
+                    # fallback to Leap Hybrid if QPU not reachable
+                    sampler = LeapHybridSampler()
+                    params = {**self.sampler_params}
+                    params.setdefault('time_limit', 5)
+                    sampleset = sampler.sample(bqm, **params)
+                    best = sampleset.first
+                    return {'sample': dict(best.sample), 'energy': float(best.energy), 'source': 'dwave_hybrid'}
             except Exception as e:
-                # fall back
-                print('D-Wave sampler unavailable or failed:', e)
+                print('D-Wave samplers unavailable or failed:', e)
 
         # Try dimod simulated annealing
         if dimod is not None:
@@ -53,7 +64,6 @@ class DWaveSolverWrapper:
                 print('Dimod SA failed:', e)
 
         # Last-resort: greedy random sampler
-        # build variable list
         vars = sorted(set([i for i,j in qubo.keys()] + [j for i,j in qubo.keys()]))
         import random
         best_sample = None
