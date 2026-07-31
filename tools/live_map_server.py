@@ -15,6 +15,7 @@ from beamng.controller import BeamNGController
 from beamng.vehicle_manager import VehicleManager
 from tools.quantum.qubo import build_qubo
 from tools.quantum.solver import DWaveSolverWrapper
+from tools.quantum.k_shortest import dijkstra
 
 MAP_DATA = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'assets', 'map_data.json')
 
@@ -37,7 +38,9 @@ async def broadcast_positions(websocket, path, controller, vehicle_manager, boun
             opt = websocket.app_state.get('optimised_routes') if hasattr(websocket, 'app_state') else None
             metrics = websocket.app_state.get('metrics') if hasattr(websocket, 'app_state') else None
             qubo = websocket.app_state.get('qubo') if hasattr(websocket, 'app_state') else None
-            payload = json.dumps({'type': 'positions', 'vehicles': msgs, 'optimised_routes': opt or {}, 'metrics': metrics or {}, 'qubo': qubo or {}})
+            manual_route = websocket.app_state.get('manual_route') if hasattr(websocket, 'app_state') else None
+            manual_route_meta = websocket.app_state.get('manual_route_meta') if hasattr(websocket, 'app_state') else None
+            payload = json.dumps({'type': 'positions', 'vehicles': msgs, 'optimised_routes': opt or {}, 'metrics': metrics or {}, 'qubo': qubo or {}, 'manual_route': manual_route or [], 'manual_route_meta': manual_route_meta or {}})
             await websocket.send(payload)
             await asyncio.sleep(0.2)
     except websockets.exceptions.ConnectionClosed:
@@ -67,13 +70,33 @@ async def main_async():
         map_data = json.load(f)
 
     # shared state for optimiser -> websocket handlers
-    app_state = {'optimised_routes': {}, 'qubo': {}}
+    app_state = {'optimised_routes': {}, 'qubo': {}, 'manual_route': [], 'manual_route_meta': {}}
 
     # build graph from map data once
     from tools.quantum.graph import build_graph_from_map, nearest_node_for_coord
     from tools.quantum.k_shortest import k_shortest_paths
 
     graph = build_graph_from_map(map_data)
+
+    def route_polyline_indices(source_nx, source_ny, target_nx, target_ny):
+        source_node = nearest_node_for_coord(graph, source_nx, source_ny)
+        target_node = nearest_node_for_coord(graph, target_nx, target_ny)
+        edge_path = dijkstra(graph, source_node, target_node)
+        if not edge_path:
+            return [], {'source_node': source_node, 'target_node': target_node, 'edge_count': 0, 'polyline_count': 0}
+
+        poly_indices = []
+        for eid in edge_path:
+            poly_idx = graph['edges'][eid]['poly_idx']
+            if not poly_indices or poly_indices[-1] != poly_idx:
+                poly_indices.append(poly_idx)
+
+        return poly_indices, {
+            'source_node': source_node,
+            'target_node': target_node,
+            'edge_count': len(edge_path),
+            'polyline_count': len(poly_indices),
+        }
 
     # simple optimiser task: every few seconds build candidate paths and solve QUBO
     async def optimiser_task():
@@ -256,6 +279,24 @@ async def main_async():
                             await ws.send(json.dumps({'type': 'opt_ack'}))
                         except Exception:
                             pass
+                    elif m.get('type') == 'route_request':
+                        src = m.get('source') or {}
+                        dst = m.get('destination') or {}
+                        try:
+                            route, meta = route_polyline_indices(float(src.get('nx', 0.5)), float(src.get('ny', 0.5)), float(dst.get('nx', 0.5)), float(dst.get('ny', 0.5)))
+                            app_state['manual_route'] = route
+                            app_state['manual_route_meta'] = meta
+                            print('Computed manual route:', meta)
+                            try:
+                                await ws.send(json.dumps({'type': 'route_ack', 'route': route, 'meta': meta}))
+                            except Exception:
+                                pass
+                        except Exception as route_error:
+                            print('Route request error:', route_error)
+                            try:
+                                await ws.send(json.dumps({'type': 'route_ack', 'route': [], 'error': str(route_error)}))
+                            except Exception:
+                                pass
                 except Exception:
                     pass
         except websockets.exceptions.ConnectionClosed:

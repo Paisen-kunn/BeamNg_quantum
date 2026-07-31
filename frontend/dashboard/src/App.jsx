@@ -55,6 +55,11 @@ export default function App() {
   const [optimisedRoutes, setOptimisedRoutes] = useState({});
   const [metrics, setMetrics] = useState({});
   const [quboData, setQuboData] = useState(null);
+  const [manualRoute, setManualRoute] = useState([]);
+  const [manualRouteMeta, setManualRouteMeta] = useState({});
+  const [routeMode, setRouteMode] = useState('source');
+  const [sourcePin, setSourcePin] = useState(null);
+  const [destinationPin, setDestinationPin] = useState(null);
   const [following, setFollowing] = useState(false);
   const [followPos, setFollowPos] = useState(null); // {nx, ny}
   const [viewMode, setViewMode] = useState('full'); // 'full' or 'minimap'
@@ -106,8 +111,22 @@ export default function App() {
             if (data.qubo) {
               setQuboData(data.qubo);
             }
+            if (Array.isArray(data.manual_route)) {
+              setManualRoute(data.manual_route);
+            }
+            if (data.manual_route_meta) {
+              setManualRouteMeta(data.manual_route_meta);
+            }
           } else if (data.type === 'opt_ack') {
             console.log('Server acked optimize request');
+          } else if (data.type === 'route_ack') {
+            console.log('Server acked route request', data.meta, data.route);
+            if (Array.isArray(data.route)) {
+              setManualRoute(data.route);
+            }
+            if (data.meta) {
+              setManualRouteMeta(data.meta);
+            }
           }
         } catch (e) {
           console.warn('Invalid WS message', e);
@@ -131,6 +150,48 @@ export default function App() {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     console.log('Requesting optimisation...');
     ws.send(JSON.stringify({ type: 'optimize' }));
+  }
+
+  function requestRoute(source, destination) {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: 'route_request', source, destination }));
+  }
+
+  function screenToNormalizedPoint(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    const nx = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const ny = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+    return { nx, ny };
+  }
+
+  function handleMapClick(e) {
+    if (routeMode === 'none') return;
+    const pt = screenToNormalizedPoint(e);
+    if (!pt) return;
+
+    if (routeMode === 'source') {
+      setSourcePin(pt);
+      if (destinationPin) {
+        requestRoute(pt, destinationPin);
+      }
+      setRouteMode('destination');
+    } else if (routeMode === 'destination') {
+      setDestinationPin(pt);
+      if (sourcePin) {
+        requestRoute(sourcePin, pt);
+      }
+      setRouteMode('source');
+    }
+  }
+
+  function clearPins() {
+    setSourcePin(null);
+    setDestinationPin(null);
+    setManualRoute([]);
+    setManualRouteMeta({});
+    setRouteMode('source');
   }
 
   // Build flattened route points (nx,ny) from optimisedRoutes for player
@@ -219,6 +280,9 @@ export default function App() {
         <button type="button" className="icon" onClick={() => setState(s => ({ ...s, scale: Math.max(s.scale / 1.25, 0.2) }))}>−</button>
         <button type="button" onClick={() => setViewMode('full')} style={{ marginLeft: 0, background: viewMode === 'full' ? '#e6eefc' : undefined }}>Full</button>
         <button type="button" onClick={() => setViewMode('minimap')} style={{ marginLeft: 0, background: viewMode === 'minimap' ? '#e6eefc' : undefined }}>Minimap</button>
+        <button type="button" onClick={() => setRouteMode('source')} style={{ marginTop: 6, background: routeMode === 'source' ? '#dbeafe' : '#eff6ff' }}>Pin Source</button>
+        <button type="button" onClick={() => setRouteMode('destination')} style={{ background: routeMode === 'destination' ? '#dbeafe' : '#eff6ff' }}>Pin Destination</button>
+        <button type="button" onClick={clearPins} style={{ background: '#f3f4f6' }}>Clear Pins</button>
         <button type="button" onClick={requestOptimise} style={{ marginTop: 6, background: '#e6ffe6' }}>Optimize</button>
         <button type="button" onClick={() => startFollow()} style={{ marginTop: 6, background: '#eef6ff' }}>Follow Route</button>
       </div>
@@ -231,6 +295,15 @@ export default function App() {
           backgroundColor: '#fbfdff',
         }}
       >
+        <div style={{ position: 'absolute', right: 16, top: 16, background: '#ffffffea', padding: '10px 12px', borderRadius: 10, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', zIndex: 25, minWidth: 220 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Route Pinning</div>
+          <div style={{ fontSize: 12, color: '#475569' }}>Click the map to place {routeMode === 'source' ? 'source' : 'destination'}.</div>
+          <div style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>Source: {sourcePin ? `${sourcePin.nx.toFixed(3)}, ${sourcePin.ny.toFixed(3)}` : 'not set'}</div>
+          <div style={{ fontSize: 12, color: '#475569' }}>Destination: {destinationPin ? `${destinationPin.nx.toFixed(3)}, ${destinationPin.ny.toFixed(3)}` : 'not set'}</div>
+          {manualRouteMeta?.edge_count != null && (
+            <div style={{ fontSize: 12, color: '#065f46', marginTop: 4 }}>Route edges: {manualRouteMeta.edge_count}</div>
+          )}
+        </div>
         {/* compare panel */}
         <div style={{ position: 'absolute', left: 16, top: 16, background: '#ffffffcc', padding: 8, borderRadius: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.12)' }}>
           <div style={{ fontSize: 12, color: '#374151' }}>Baseline total: {metrics?.baseline_total ? metrics.baseline_total.toFixed(2) : '—'}</div>
@@ -239,7 +312,7 @@ export default function App() {
             <div style={{ fontSize: 12, color: '#065f46' }}>Reduction: {((1 - (metrics.optimized_total / metrics.baseline_total)) * 100).toFixed(1)}%</div>
           )}
         </div>
-        <svg viewBox="0 0 1 1" preserveAspectRatio="xMidYMid meet" width={w} height={h}>
+        <svg viewBox="0 0 1 1" preserveAspectRatio="xMidYMid meet" width={w} height={h} onClick={handleMapClick} style={{ cursor: routeMode === 'none' ? 'grab' : 'crosshair' }}>
           {/* grid */}
           <defs>
             <pattern id="grid" width="0.25" height="0.25" patternUnits="objectBoundingBox">
@@ -274,6 +347,14 @@ export default function App() {
                 </g>
               );
             })}
+          {/* highlight manual route from source/destination pins */}
+          {Array.isArray(manualRoute) && manualRoute.map((pli) => {
+            const pl = mapData.polylines[pli];
+            if (!pl) return null;
+            return (
+              <polyline key={`manual-${pli}`} points={pointsToStr(pl.points)} fill="none" stroke="#f97316" strokeWidth={Math.max(0.005, strokeWidth * 12)} strokeLinecap="round" strokeLinejoin="round" opacity={0.98} />
+            );
+          })}
           {/* highlight optimised route for player if available */}
           {(() => {
             const ids = Object.keys(vehicles);
@@ -312,6 +393,8 @@ export default function App() {
 
             return (
               <g>
+                {sourcePin && <circle cx={sourcePin.nx} cy={sourcePin.ny} r={0.012 / state.scale} fill="#2563eb" stroke="#fff" strokeWidth={0.001} />}
+                {destinationPin && <circle cx={destinationPin.nx} cy={destinationPin.ny} r={0.012 / state.scale} fill="#ef4444" stroke="#fff" strokeWidth={0.001} />}
                 {/* other vehicles as small dots */}
                 {others.map((v) => (
                   <circle key={v.id} cx={v.nx} cy={v.ny} r={0.009 / state.scale} fill="rgba(220,38,38,0.95)" stroke="#fff" strokeWidth={0.0008} />
