@@ -69,18 +69,32 @@ export default function App() {
       ws.onmessage = (ev) => {
         try {
           const data = JSON.parse(ev.data);
-          if (data.type === 'positions') {
+            if (data.type === 'positions') {
             const map = {};
             for (const v of data.vehicles) {
               map[v.id] = v;
             }
             setVehicles(map);
             if (data.optimised_routes) {
-              setOptimisedRoutes(data.optimised_routes);
-            }
-              if (data.metrics) {
-                setMetrics(data.metrics);
+              // Normalize routes: server may send array of polyline indices or array-of-arrays
+              const norm = {};
+              for (const [vid, val] of Object.entries(data.optimised_routes)) {
+                if (Array.isArray(val)) {
+                  // if items are arrays, flatten one level
+                  if (val.length > 0 && Array.isArray(val[0])) {
+                    norm[vid] = [].concat(...val);
+                  } else {
+                    norm[vid] = val.slice();
+                  }
+                } else if (val != null) {
+                  norm[vid] = [val];
+                }
               }
+              setOptimisedRoutes(norm);
+            }
+            if (data.metrics) {
+              setMetrics(data.metrics);
+            }
           }
         } catch (e) {
           console.warn('Invalid WS message', e);
