@@ -70,6 +70,7 @@ export default function App() {
         try {
           const data = JSON.parse(ev.data);
             if (data.type === 'positions') {
+            console.log('Received positions payload. optimised_routes=', data.optimised_routes);
             const map = {};
             for (const v of data.vehicles) {
               map[v.id] = v;
@@ -95,6 +96,8 @@ export default function App() {
             if (data.metrics) {
               setMetrics(data.metrics);
             }
+          } else if (data.type === 'opt_ack') {
+            console.log('Server acked optimize request');
           }
         } catch (e) {
           console.warn('Invalid WS message', e);
