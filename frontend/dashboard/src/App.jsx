@@ -54,6 +54,7 @@ export default function App() {
   const [vehicles, setVehicles] = useState({});
   const [optimisedRoutes, setOptimisedRoutes] = useState({});
   const [metrics, setMetrics] = useState({});
+  const [quboData, setQuboData] = useState(null);
   const [following, setFollowing] = useState(false);
   const [followPos, setFollowPos] = useState(null); // {nx, ny}
   const [viewMode, setViewMode] = useState('full'); // 'full' or 'minimap'
@@ -70,7 +71,7 @@ export default function App() {
         try {
           const data = JSON.parse(ev.data);
             if (data.type === 'positions') {
-            console.log('Received positions payload. optimised_routes=', data.optimised_routes);
+            console.log('Received positions payload. optimised_routes=', data.optimised_routes, 'qubo=', data.qubo);
             const map = {};
             for (const v of data.vehicles) {
               map[v.id] = v;
@@ -95,6 +96,9 @@ export default function App() {
             }
             if (data.metrics) {
               setMetrics(data.metrics);
+            }
+            if (data.qubo) {
+              setQuboData(data.qubo);
             }
           } else if (data.type === 'opt_ack') {
             console.log('Server acked optimize request');
@@ -351,6 +355,46 @@ export default function App() {
                   <circle key={v.id} cx={v.nx} cy={v.ny} r={r} fill={v.id === playerId ? '#16a34a' : 'rgba(220,38,38,0.95)'} stroke="#fff" strokeWidth={worldSize * 0.005} />
                 ))}
               </svg>
+            </div>
+          );
+        })()}
+        {/* QUBO heatmap overlay */}
+        {quboData && (() => {
+          const matrix = quboData.matrix || [];
+          const labels = quboData.labels || [];
+          const N = matrix.length;
+          if (N === 0) return null;
+
+          // compute max absolute for normalization
+          let maxAbs = 0;
+          for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) maxAbs = Math.max(maxAbs, Math.abs(matrix[i][j] || 0));
+          if (maxAbs === 0) maxAbs = 1.0;
+
+          const size = 180;
+          const cell = size / N;
+
+          const colorFor = (v) => {
+            const norm = Math.max(-1, Math.min(1, v / maxAbs));
+            // positive -> red, negative -> blue, zero -> white
+            if (norm > 0) {
+              const t = Math.round(255 - Math.floor(200 * (1 - norm)));
+              return `rgb(255,${200 - Math.floor(120 * (1 - norm))},${200 - Math.floor(120 * (1 - norm))})`;
+            } else if (norm < 0) {
+              const t = Math.round(255 - Math.floor(200 * (1 + norm)));
+              return `rgb(${200 - Math.floor(120 * (1 + norm))},${200 - Math.floor(120 * (1 + norm))},255)`;
+            }
+            return '#ffffff';
+          };
+
+          return (
+            <div style={{ position: 'absolute', left: 16, bottom: 16, width: size, height: size, background: '#fff', borderRadius: 8, padding: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.12)', fontSize: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>QUBO Energy Density</div>
+              <svg width={size - 16} height={size - 40} viewBox={`0 0 ${size - 16} ${size - 40}`}>
+                {matrix.map((row, i) => row.map((val, j) => (
+                  <rect key={`${i}-${j}`} x={j * cell} y={i * cell} width={cell} height={cell} fill={colorFor(val)} stroke="#ccc" strokeWidth={0.3} />
+                )))}
+              </svg>
+              <div style={{ marginTop: 6, color: '#374151' }}>{labels.slice(0, 6).join(', ')}</div>
             </div>
           );
         })()}

@@ -25,6 +25,15 @@ svg { display: block; }
 }
 /* ensure controls receive pointer events above overlays */
 .map-controls { pointer-events: auto; }
+
+/* QUBO heatmap panel */
+.qubo-panel {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 30;
+  pointer-events: none;
+}
 .map-controls button {
   min-width: 40px;
   height: 40px;
