@@ -1,8 +1,174 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import mapData from '../../assets/map_data.json';
 
 const PICK_DROP_ROUTE_COLOR = '#ec4899';
 const BEST_ROUTE_DARK_PINK = '#9d174d';
+
+function pointDistanceSq(a, b) {
+  const dx = a.nx - b.nx;
+  const dy = a.ny - b.ny;
+  return dx * dx + dy * dy;
+}
+
+function pointDistance(a, b) {
+  return Math.sqrt(pointDistanceSq(a, b));
+}
+
+function roadNodeKey(point) {
+  const GRID = 850; // tolerant merge for near-identical intersection coordinates
+  return `${Math.round(point.nx * GRID)}:${Math.round(point.ny * GRID)}`;
+}
+
+function buildRoadNetwork(polylines) {
+  const nodes = [];
+  const nodeIndexByKey = new Map();
+  const adjacency = [];
+  const stitchBuckets = new Map();
+
+  function addEdge(aIdx, bIdx, w) {
+    if (aIdx === bIdx) return;
+    adjacency[aIdx].push({ to: bIdx, w });
+    adjacency[bIdx].push({ to: aIdx, w });
+  }
+
+  function ensureNode(point) {
+    const key = roadNodeKey(point);
+    let idx = nodeIndexByKey.get(key);
+    if (idx !== undefined) {
+      const n = nodes[idx];
+      // keep centroid stable inside each merged cluster
+      const count = n.count + 1;
+      n.nx = (n.nx * n.count + point.nx) / count;
+      n.ny = (n.ny * n.count + point.ny) / count;
+      n.count = count;
+      return idx;
+    }
+
+    idx = nodes.length;
+    nodes.push({ nx: point.nx, ny: point.ny, count: 1 });
+    adjacency.push([]);
+    nodeIndexByKey.set(key, idx);
+
+    const bx = Math.floor(point.nx * 220);
+    const by = Math.floor(point.ny * 220);
+    const bucketKey = `${bx}:${by}`;
+    if (!stitchBuckets.has(bucketKey)) stitchBuckets.set(bucketKey, []);
+    stitchBuckets.get(bucketKey).push(idx);
+
+    return idx;
+  }
+
+  for (let i = 0; i < polylines.length; i++) {
+    const points = polylines[i]?.points || [];
+    if (!Array.isArray(points) || points.length < 2) continue;
+
+    for (let p = 0; p < points.length - 1; p++) {
+      const a = points[p];
+      const b = points[p + 1];
+      if (!a || !b || typeof a.nx !== 'number' || typeof a.ny !== 'number' || typeof b.nx !== 'number' || typeof b.ny !== 'number') {
+        continue;
+      }
+
+      const aIdx = ensureNode(a);
+      const bIdx = ensureNode(b);
+      if (aIdx === bIdx) continue;
+
+      const w = pointDistance(a, b);
+      addEdge(aIdx, bIdx, w);
+    }
+  }
+
+  // Stitch tiny map extraction gaps so road continuity works in fallback routing.
+  const STITCH_THRESHOLD = 0.0045;
+  for (const [bucketKey, bucketNodes] of stitchBuckets.entries()) {
+    const [bxRaw, byRaw] = bucketKey.split(':');
+    const bx = Number(bxRaw);
+    const by = Number(byRaw);
+
+    for (let ox = -1; ox <= 1; ox++) {
+      for (let oy = -1; oy <= 1; oy++) {
+        const neighborKey = `${bx + ox}:${by + oy}`;
+        const neighborNodes = stitchBuckets.get(neighborKey);
+        if (!neighborNodes) continue;
+
+        for (const aIdx of bucketNodes) {
+          for (const bIdx of neighborNodes) {
+            if (aIdx >= bIdx) continue;
+            const a = nodes[aIdx];
+            const b = nodes[bIdx];
+            const d = pointDistance(a, b);
+            if (d > 0 && d <= STITCH_THRESHOLD) {
+              addEdge(aIdx, bIdx, d * 1.2);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return { nodes, adjacency };
+}
+
+function findNearestNodeIndex(nodes, targetPoint) {
+  let nearestIndex = -1;
+  let nearestDist = Number.POSITIVE_INFINITY;
+
+  for (let i = 0; i < nodes.length; i++) {
+    const d = pointDistanceSq(nodes[i], targetPoint);
+    if (d < nearestDist) {
+      nearestDist = d;
+      nearestIndex = i;
+    }
+  }
+
+  return nearestIndex;
+}
+
+function shortestPathNodeIndices(adjacency, start, end) {
+  if (start < 0 || end < 0) return [];
+  if (start === end) return [start];
+
+  const n = adjacency.length;
+  const dist = Array.from({ length: n }, () => Number.POSITIVE_INFINITY);
+  const prev = Array.from({ length: n }, () => -1);
+  const used = Array.from({ length: n }, () => false);
+  dist[start] = 0;
+
+  for (let iter = 0; iter < n; iter++) {
+    let u = -1;
+    let best = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < n; i++) {
+      if (!used[i] && dist[i] < best) {
+        best = dist[i];
+        u = i;
+      }
+    }
+
+    if (u === -1) break;
+    if (u === end) break;
+    used[u] = true;
+
+    for (const edge of adjacency[u]) {
+      const alt = dist[u] + edge.w;
+      if (alt < dist[edge.to]) {
+        dist[edge.to] = alt;
+        prev[edge.to] = u;
+      }
+    }
+  }
+
+  if (!Number.isFinite(dist[end])) return [];
+
+  const path = [];
+  let cursor = end;
+  while (cursor >= 0) {
+    path.push(cursor);
+    if (cursor === start) break;
+    cursor = prev[cursor];
+  }
+
+  return path.reverse();
+}
 
 export default function App() {
   const containerRef = useRef(null);
@@ -66,6 +232,34 @@ export default function App() {
   const [following, setFollowing] = useState(false);
   const [followPos, setFollowPos] = useState(null); // {nx, ny}
   const [viewMode, setViewMode] = useState('full'); // 'full' or 'minimap'
+
+  const roadNetwork = useMemo(() => {
+    return buildRoadNetwork(mapData?.polylines || []);
+  }, []);
+
+  const localRoadFallbackPath = useMemo(() => {
+    if (!sourcePin || !destinationPin) return [];
+    if (!roadNetwork.nodes.length) return [];
+
+    const start = findNearestNodeIndex(roadNetwork.nodes, sourcePin);
+    const end = findNearestNodeIndex(roadNetwork.nodes, destinationPin);
+    const nodePath = shortestPathNodeIndices(roadNetwork.adjacency, start, end);
+    if (nodePath.length === 0) return [];
+
+    const points = [sourcePin];
+    for (const idx of nodePath) {
+      points.push(roadNetwork.nodes[idx]);
+    }
+    points.push(destinationPin);
+
+    const compact = [];
+    for (const p of points) {
+      if (!compact.length || pointDistanceSq(compact[compact.length - 1], p) > 1e-10) {
+        compact.push(p);
+      }
+    }
+    return compact;
+  }, [sourcePin, destinationPin, roadNetwork]);
 
   const wsRef = useRef(null);
 
@@ -303,7 +497,9 @@ export default function App() {
           <div style={{ fontSize: 12, color: '#475569' }}>Mode: {routeMode === 'source' ? 'Select source' : 'Select destination'}</div>
           <div style={{ fontSize: 12, color: '#15803d', marginTop: 4 }}>Source: {sourcePin ? `${sourcePin.nx.toFixed(3)}, ${sourcePin.ny.toFixed(3)}` : 'unset'}</div>
           <div style={{ fontSize: 12, color: '#b91c1c' }}>Destination: {destinationPin ? `${destinationPin.nx.toFixed(3)}, ${destinationPin.ny.toFixed(3)}` : 'unset'}</div>
-          <div style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>Highlighted route: {manualRoute.length > 0 ? `${manualRoute.length} segments` : 'none yet'}</div>
+          <div style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>
+            Highlighted route: {manualRoute.length > 0 ? `${manualRoute.length} segments` : localRoadFallbackPath.length > 1 ? `${localRoadFallbackPath.length - 1} segments (local road path)` : 'none yet'}
+          </div>
           <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>Pick/Drop route: <span style={{ color: PICK_DROP_ROUTE_COLOR, fontWeight: 700 }}>pink</span></div>
           <div style={{ fontSize: 11, color: '#6b7280' }}>Best route: <span style={{ color: BEST_ROUTE_DARK_PINK, fontWeight: 700 }}>dark pink</span></div>
         </div>
@@ -351,11 +547,36 @@ export default function App() {
               );
             })}
           {/* highlight manual route from source/destination pins */}
+          {sourcePin && destinationPin && (!Array.isArray(manualRoute) || manualRoute.length === 0) && localRoadFallbackPath.length > 1 && (
+            <g>
+              <polyline
+                points={pointsToStr(localRoadFallbackPath)}
+                fill="none"
+                stroke="#fbcfe8"
+                strokeWidth={Math.max(0.008, strokeWidth * 16)}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={0.95}
+              />
+              <polyline
+                points={pointsToStr(localRoadFallbackPath)}
+                fill="none"
+                stroke={PICK_DROP_ROUTE_COLOR}
+                strokeWidth={Math.max(0.005, strokeWidth * 11)}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={0.98}
+              />
+            </g>
+          )}
           {Array.isArray(manualRoute) && manualRoute.map((pli) => {
             const pl = mapData.polylines[pli];
             if (!pl) return null;
             return (
-              <polyline key={`manual-${pli}`} points={pointsToStr(pl.points)} fill="none" stroke={PICK_DROP_ROUTE_COLOR} strokeWidth={Math.max(0.005, strokeWidth * 12)} strokeLinecap="round" strokeLinejoin="round" opacity={0.98} />
+              <g key={`manual-${pli}`}>
+                <polyline points={pointsToStr(pl.points)} fill="none" stroke="#fbcfe8" strokeWidth={Math.max(0.008, strokeWidth * 16)} strokeLinecap="round" strokeLinejoin="round" opacity={0.95} />
+                <polyline points={pointsToStr(pl.points)} fill="none" stroke={PICK_DROP_ROUTE_COLOR} strokeWidth={Math.max(0.005, strokeWidth * 11)} strokeLinecap="round" strokeLinejoin="round" opacity={0.98} />
+              </g>
             );
           })}
           {/* highlight optimised route for player if available */}
@@ -375,6 +596,21 @@ export default function App() {
               );
             });
           })()}
+          {/* source and destination pins must be visible even if no vehicles are streaming */}
+          {sourcePin && (
+            <g>
+              <circle cx={sourcePin.nx} cy={sourcePin.ny} r={0.018 / state.scale} fill="#16a34a" stroke="#ffffff" strokeWidth={0.002} />
+              <circle cx={sourcePin.nx} cy={sourcePin.ny} r={0.006 / state.scale} fill="#dcfce7" stroke="none" />
+              <text x={sourcePin.nx + 0.008} y={sourcePin.ny - 0.008} fontSize={0.018 / state.scale} fill="#166534" stroke="#ffffff" strokeWidth={0.0008} paintOrder="stroke">S</text>
+            </g>
+          )}
+          {destinationPin && (
+            <g>
+              <circle cx={destinationPin.nx} cy={destinationPin.ny} r={0.018 / state.scale} fill="#dc2626" stroke="#ffffff" strokeWidth={0.002} />
+              <circle cx={destinationPin.nx} cy={destinationPin.ny} r={0.006 / state.scale} fill="#fee2e2" stroke="none" />
+              <text x={destinationPin.nx + 0.008} y={destinationPin.ny - 0.008} fontSize={0.018 / state.scale} fill="#991b1b" stroke="#ffffff" strokeWidth={0.0008} paintOrder="stroke">D</text>
+            </g>
+          )}
           {/* find main player (id contains 'player' or fallback to first) */}
           {(() => {
             const ids = Object.keys(vehicles);
@@ -396,20 +632,6 @@ export default function App() {
 
             return (
               <g>
-                {sourcePin && (
-                  <g>
-                    <circle cx={sourcePin.nx} cy={sourcePin.ny} r={0.018 / state.scale} fill="#16a34a" stroke="#ffffff" strokeWidth={0.002} />
-                    <circle cx={sourcePin.nx} cy={sourcePin.ny} r={0.006 / state.scale} fill="#dcfce7" stroke="none" />
-                    <text x={sourcePin.nx + 0.008} y={sourcePin.ny - 0.008} fontSize={0.018 / state.scale} fill="#166534" stroke="#ffffff" strokeWidth={0.0008} paintOrder="stroke">S</text>
-                  </g>
-                )}
-                {destinationPin && (
-                  <g>
-                    <circle cx={destinationPin.nx} cy={destinationPin.ny} r={0.018 / state.scale} fill="#dc2626" stroke="#ffffff" strokeWidth={0.002} />
-                    <circle cx={destinationPin.nx} cy={destinationPin.ny} r={0.006 / state.scale} fill="#fee2e2" stroke="none" />
-                    <text x={destinationPin.nx + 0.008} y={destinationPin.ny - 0.008} fontSize={0.018 / state.scale} fill="#991b1b" stroke="#ffffff" strokeWidth={0.0008} paintOrder="stroke">D</text>
-                  </g>
-                )}
                 {/* other vehicles as small dots */}
                 {others.map((v) => (
                   <circle key={v.id} cx={v.nx} cy={v.ny} r={0.009 / state.scale} fill="rgba(220,38,38,0.95)" stroke="#fff" strokeWidth={0.0008} />
