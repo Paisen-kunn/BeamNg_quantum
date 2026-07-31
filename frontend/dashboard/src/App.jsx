@@ -296,13 +296,11 @@ export default function App() {
         }}
       >
         <div style={{ position: 'absolute', right: 16, top: 16, background: '#ffffffea', padding: '10px 12px', borderRadius: 10, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', zIndex: 25, minWidth: 220 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Route Pinning</div>
-          <div style={{ fontSize: 12, color: '#475569' }}>Click the map to place {routeMode === 'source' ? 'source' : 'destination'}.</div>
-          <div style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>Source: {sourcePin ? `${sourcePin.nx.toFixed(3)}, ${sourcePin.ny.toFixed(3)}` : 'not set'}</div>
-          <div style={{ fontSize: 12, color: '#475569' }}>Destination: {destinationPin ? `${destinationPin.nx.toFixed(3)}, ${destinationPin.ny.toFixed(3)}` : 'not set'}</div>
-          {manualRouteMeta?.edge_count != null && (
-            <div style={{ fontSize: 12, color: '#065f46', marginTop: 4 }}>Route edges: {manualRouteMeta.edge_count}</div>
-          )}
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Routing Simulation</div>
+          <div style={{ fontSize: 12, color: '#475569' }}>Mode: {routeMode === 'source' ? 'Select source' : 'Select destination'}</div>
+          <div style={{ fontSize: 12, color: '#15803d', marginTop: 4 }}>Source: {sourcePin ? `${sourcePin.nx.toFixed(3)}, ${sourcePin.ny.toFixed(3)}` : 'unset'}</div>
+          <div style={{ fontSize: 12, color: '#b91c1c' }}>Destination: {destinationPin ? `${destinationPin.nx.toFixed(3)}, ${destinationPin.ny.toFixed(3)}` : 'unset'}</div>
+          <div style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>Highlighted route: {manualRoute.length > 0 ? `${manualRoute.length} segments` : 'none yet'}</div>
         </div>
         {/* compare panel */}
         <div style={{ position: 'absolute', left: 16, top: 16, background: '#ffffffcc', padding: 8, borderRadius: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.12)' }}>
