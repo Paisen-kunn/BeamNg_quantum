@@ -116,6 +116,7 @@ export default function App() {
   function requestOptimise() {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    console.log('Requesting optimisation...');
     ws.send(JSON.stringify({ type: 'optimize' }));
   }
 
@@ -141,6 +142,7 @@ export default function App() {
   let followRaf = null;
   function startFollow() {
     if (following) return;
+    console.log('Starting follow');
     const pts = buildRoutePointsForPlayer();
     if (!pts || pts.length < 2) return;
     setFollowing(true);
@@ -200,12 +202,12 @@ export default function App() {
       onMouseLeave={onMouseUp}
     >
       <div className="map-controls">
-        <button className="icon" onClick={() => setState(s => ({ ...s, scale: Math.min(s.scale * 1.25, 8) }))}>+</button>
-        <button className="icon" onClick={() => setState(s => ({ ...s, scale: Math.max(s.scale / 1.25, 0.2) }))}>−</button>
-        <button onClick={() => setViewMode('full')} style={{ marginLeft: 0, background: viewMode === 'full' ? '#e6eefc' : undefined }}>Full</button>
-        <button onClick={() => setViewMode('minimap')} style={{ marginLeft: 0, background: viewMode === 'minimap' ? '#e6eefc' : undefined }}>Minimap</button>
-        <button onClick={requestOptimise} style={{ marginTop: 6, background: '#e6ffe6' }}>Optimize</button>
-        <button onClick={() => startFollow()} style={{ marginTop: 6, background: '#eef6ff' }}>Follow Route</button>
+        <button type="button" className="icon" onClick={() => setState(s => ({ ...s, scale: Math.min(s.scale * 1.25, 8) }))}>+</button>
+        <button type="button" className="icon" onClick={() => setState(s => ({ ...s, scale: Math.max(s.scale / 1.25, 0.2) }))}>−</button>
+        <button type="button" onClick={() => setViewMode('full')} style={{ marginLeft: 0, background: viewMode === 'full' ? '#e6eefc' : undefined }}>Full</button>
+        <button type="button" onClick={() => setViewMode('minimap')} style={{ marginLeft: 0, background: viewMode === 'minimap' ? '#e6eefc' : undefined }}>Minimap</button>
+        <button type="button" onClick={requestOptimise} style={{ marginTop: 6, background: '#e6ffe6' }}>Optimize</button>
+        <button type="button" onClick={() => startFollow()} style={{ marginTop: 6, background: '#eef6ff' }}>Follow Route</button>
       </div>
       <div
         className="svg-wrapper"
