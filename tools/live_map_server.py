@@ -36,7 +36,8 @@ async def broadcast_positions(websocket, path, controller, vehicle_manager, boun
             # include any optimised routes and metrics computed by background optimiser
             opt = websocket.app_state.get('optimised_routes') if hasattr(websocket, 'app_state') else None
             metrics = websocket.app_state.get('metrics') if hasattr(websocket, 'app_state') else None
-            payload = json.dumps({'type': 'positions', 'vehicles': msgs, 'optimised_routes': opt or {}, 'metrics': metrics or {}})
+            qubo = websocket.app_state.get('qubo') if hasattr(websocket, 'app_state') else None
+            payload = json.dumps({'type': 'positions', 'vehicles': msgs, 'optimised_routes': opt or {}, 'metrics': metrics or {}, 'qubo': qubo or {}})
             await websocket.send(payload)
             await asyncio.sleep(0.2)
     except websockets.exceptions.ConnectionClosed:
