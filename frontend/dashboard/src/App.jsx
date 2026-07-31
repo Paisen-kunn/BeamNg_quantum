@@ -64,9 +64,15 @@ export default function App() {
   useEffect(() => {
     let ws;
     try {
-      ws = new WebSocket('ws://localhost:8765');
-      wsRef.current = ws;
-      ws.onopen = () => console.log('Connected to live map server');
+    // connect to the backend WebSocket on the same host that served the page
+    const wsHost = window.location.hostname || 'localhost';
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsPort = 8765;
+    const wsUrl = `${wsProtocol}//${wsHost}:${wsPort}`;
+    console.log('Connecting to WS at', wsUrl);
+    ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+    ws.onopen = () => console.log('Connected to live map server', wsUrl);
       ws.onmessage = (ev) => {
         try {
           const data = JSON.parse(ev.data);
