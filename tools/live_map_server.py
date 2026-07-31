@@ -204,6 +204,10 @@ async def main_async():
 
                     app_state['optimised_routes'] = chosen_polylines
                     app_state['metrics'] = {'baseline_total': baseline_total, 'optimized_total': optimized_total}
+                    try:
+                        print('Optimiser produced routes:', json.dumps({'routes': chosen_polylines, 'metrics': app_state['metrics']}))
+                    except Exception:
+                        print('Optimiser produced routes (non-serializable)')
             except Exception as e:
                 print('Optimiser error:', e)
             await asyncio.sleep(5.0)
@@ -228,6 +232,15 @@ async def main_async():
                     if m.get('type') == 'optimize':
                         # signal optimiser to run immediately
                         app_state['optimize_request'] = True
+                        try:
+                            print('Received optimize request from client')
+                        except Exception:
+                            pass
+                        # send ack back to client
+                        try:
+                            await ws.send(json.dumps({'type': 'opt_ack'}))
+                        except Exception:
+                            pass
                 except Exception:
                     pass
         except websockets.exceptions.ConnectionClosed:
