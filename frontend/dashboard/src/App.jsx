@@ -54,6 +54,8 @@ export default function App() {
   const [vehicles, setVehicles] = useState({});
   const [optimisedRoutes, setOptimisedRoutes] = useState({});
   const [metrics, setMetrics] = useState({});
+  const [following, setFollowing] = useState(false);
+  const [followPos, setFollowPos] = useState(null); // {nx, ny}
   const [viewMode, setViewMode] = useState('full'); // 'full' or 'minimap'
 
   const wsRef = useRef(null);
@@ -103,6 +105,71 @@ export default function App() {
     ws.send(JSON.stringify({ type: 'optimize' }));
   }
 
+  // Build flattened route points (nx,ny) from optimisedRoutes for player
+  function buildRoutePointsForPlayer() {
+    const ids = Object.keys(vehicles);
+    if (ids.length === 0) return [];
+    const playerId = ids.find((id) => id.toLowerCase().includes('player')) || ids[0];
+    const chosen = optimisedRoutes[playerId];
+    if (!chosen) return [];
+    const pts = [];
+    for (const pli of chosen) {
+      const pl = mapData.polylines[pli];
+      if (!pl) continue;
+      for (const p of pl.points) {
+        pts.push({ nx: p.nx, ny: p.ny });
+      }
+    }
+    return pts;
+  }
+
+  // follow animation: moves a synthetic marker along route points
+  let followRaf = null;
+  function startFollow() {
+    if (following) return;
+    const pts = buildRoutePointsForPlayer();
+    if (!pts || pts.length < 2) return;
+    setFollowing(true);
+    // compute speed factor from metrics (smaller optimized_total => faster)
+    const baseline = metrics?.baseline_total || 1.0;
+    const optimized = metrics?.optimized_total || baseline;
+    const speedFactor = Math.max(0.2, Math.min(4.0, baseline / Math.max(1e-6, optimized)));
+
+    // step along points with interpolation
+    let index = 0;
+    let t = 0;
+    const baseStep = 0.008; // fraction per frame
+
+    function step() {
+      if (!following) return;
+      const a = pts[index];
+      const b = pts[index + 1] || a;
+      t += baseStep * speedFactor;
+      if (t >= 1.0) {
+        index += 1;
+        t = 0;
+        if (index >= pts.length - 1) {
+          // finished
+          setFollowing(false);
+          setFollowPos(null);
+          cancelAnimationFrame(followRaf);
+          return;
+        }
+      }
+      const nx = a.nx + (b.nx - a.nx) * t;
+      const ny = a.ny + (b.ny - a.ny) * t;
+      setFollowPos({ nx, ny });
+      followRaf = requestAnimationFrame(step);
+    }
+
+    followRaf = requestAnimationFrame(step);
+  }
+
+  function stopFollow() {
+    setFollowing(false);
+    setFollowPos(null);
+  }
+
   // stroke width scales inversely with zoom so inner/core lines become thinner when zoomed in
   // Use much smaller base and minimum values so lines render thin like Google map roads
   const baseStroke = 0.0004; // viewBox units (reduced)
@@ -124,6 +191,7 @@ export default function App() {
         <button onClick={() => setViewMode('full')} style={{ marginLeft: 0, background: viewMode === 'full' ? '#e6eefc' : undefined }}>Full</button>
         <button onClick={() => setViewMode('minimap')} style={{ marginLeft: 0, background: viewMode === 'minimap' ? '#e6eefc' : undefined }}>Minimap</button>
         <button onClick={requestOptimise} style={{ marginTop: 6, background: '#e6ffe6' }}>Optimize</button>
+        <button onClick={() => startFollow()} style={{ marginTop: 6, background: '#eef6ff' }}>Follow Route</button>
       </div>
       <div
         className="svg-wrapper"
@@ -223,6 +291,10 @@ export default function App() {
                 {/* player icon: same size as other vehicles (green) */}
                 {player && (
                   <circle key={player.id} cx={player.nx} cy={player.ny} r={0.009 / state.scale} fill="#16a34a" stroke="#fff" strokeWidth={0.0008} />
+                )}
+                {/* synthetic follow marker (animated) */}
+                {followPos && (
+                  <circle cx={followPos.nx} cy={followPos.ny} r={0.011 / state.scale} fill="#0ea5a4" stroke="#fff" strokeWidth={0.001} />
                 )}
               </g>
             );
