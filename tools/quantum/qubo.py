@@ -11,7 +11,7 @@ or samplers that accept a QUBO dictionary.
 """
 from typing import Dict, Tuple, List, Any
 
-def build_qubo(vehicle_paths, path_costs=None, same_vehicle_penalty=10.0, overlap_penalty=5.0):
+def build_qubo(vehicle_paths, path_costs=None, same_vehicle_penalty=10.0, overlap_penalty=5.0, edge_capacity=None):
     """
     Build a QUBO for a routing assignment problem.
 
@@ -44,7 +44,7 @@ def build_qubo(vehicle_paths, path_costs=None, same_vehicle_penalty=10.0, overla
             i, j = j, i
         qubo[(i,j)] = qubo.get((i,j), 0.0) + w
 
-    # linear terms from path costs
+    # linear terms from path costs (travel-time objective)
     for idx, (vid, pidx) in index_map.items():
         if path_costs and (vid, pidx) in path_costs:
             cost = float(path_costs[(vid, pidx)])
@@ -52,6 +52,7 @@ def build_qubo(vehicle_paths, path_costs=None, same_vehicle_penalty=10.0, overla
             # default cost: path length (number of edges)
             cost = float(len(vehicle_paths[vid][pidx]))
         # incorporate the one-hot penalty linear shift: c_i - same_vehicle_penalty
+        # lower cost is better, so we add positive cost as linear term
         add_qubo(idx, idx, cost - float(same_vehicle_penalty))
 
     # same-vehicle coupling to enforce exactly-one via penalty*(sum-1)^2
@@ -62,7 +63,7 @@ def build_qubo(vehicle_paths, path_costs=None, same_vehicle_penalty=10.0, overla
                 # coefficient 2*penalty for pairwise term (see derivation)
                 add_qubo(indices[i], indices[j], 2.0 * float(same_vehicle_penalty))
 
-    # overlap penalties between different vehicles' paths
+    # overlap penalties between different vehicles' paths using same edge segments
     # build edge->list(vars) map
     edge_map = {}
     for idx, (vid, pidx) in index_map.items():
@@ -71,10 +72,17 @@ def build_qubo(vehicle_paths, path_costs=None, same_vehicle_penalty=10.0, overla
             edge_map.setdefault(e, []).append(idx)
 
     for e, varlist in edge_map.items():
-        # for every pair using same edge, penalize joint selection
+        cap = 1
+        if edge_capacity and e in edge_capacity:
+            try:
+                cap = int(edge_capacity[e])
+            except Exception:
+                cap = 1
+        # For every pair using same edge, penalize joint selection scaled by capacity
+        scaled_penalty = float(overlap_penalty) / max(1.0, cap)
         for i in range(len(varlist)):
             for j in range(i+1, len(varlist)):
-                add_qubo(varlist[i], varlist[j], float(overlap_penalty))
+                add_qubo(varlist[i], varlist[j], scaled_penalty)
 
     return qubo, index_map
 

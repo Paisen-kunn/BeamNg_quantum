@@ -33,9 +33,10 @@ async def broadcast_positions(websocket, path, controller, vehicle_manager, boun
                 ny = (maxy - y) / (maxy - miny) if maxy != miny else 0.5
                 msgs.append({'id': v['id'], 'x': x, 'y': y, 'nx': nx, 'ny': ny, 'speed': v['speed']})
 
-            # include any optimised routes computed by background optimiser
+            # include any optimised routes and metrics computed by background optimiser
             opt = websocket.app_state.get('optimised_routes') if hasattr(websocket, 'app_state') else None
-            payload = json.dumps({'type': 'positions', 'vehicles': msgs, 'optimised_routes': opt or {}})
+            metrics = websocket.app_state.get('metrics') if hasattr(websocket, 'app_state') else None
+            payload = json.dumps({'type': 'positions', 'vehicles': msgs, 'optimised_routes': opt or {}, 'metrics': metrics or {}})
             await websocket.send(payload)
             await asyncio.sleep(0.2)
     except websockets.exceptions.ConnectionClosed:
@@ -97,7 +98,8 @@ async def main_async():
             try:
                 traffic = vm.get_vehicle_data()
                 # Build candidate k-shortest paths per vehicle using road graph
-                vehicle_paths = {}
+                vehicle_paths = {}       # paths as lists of edge ids (for QUBO)
+                vehicle_display = {}     # paths as lists of polyline indices (for dashboard)
                 path_costs = {}
 
                 for v in traffic:
@@ -127,23 +129,27 @@ async def main_async():
 
                     K = 3
                     candidates = []
+                    disp_candidates = []
                     for t in targets[:3]:
                         paths = k_shortest_paths(graph, src, t, K=K)
                         for pidx, path in enumerate(paths[:K]):
-                            # convert path (edge ids) to polyline index sequence
-                            poly_seq = [graph['edges'][eid]['poly_idx'] for eid in path]
-                            if not poly_seq:
+                            if not path:
                                 continue
                             key = len(candidates)
-                            candidates.append(poly_seq)
+                            candidates.append(path)
+                            # display sequence: map edge ids to polyline indices (keep order)
+                            poly_seq = [graph['edges'][eid]['poly_idx'] for eid in path]
+                            disp_candidates.append(poly_seq)
                             # cost = total length
                             cost = sum(graph['edges'][eid]['weight'] for eid in path)
                             path_costs[(vid, key)] = float(cost)
                     if not candidates:
                         # fallback to nearest polyline index
                         candidates = [[0]]
+                        disp_candidates = [[0]]
                         path_costs[(vid,0)] = 1.0
                     vehicle_paths[vid] = candidates
+                    vehicle_display[vid] = disp_candidates
 
                 # honour on-demand optimisation trigger
                 if app_state.get('optimize_request'):
@@ -152,8 +158,11 @@ async def main_async():
                 else:
                     run_now = False
 
+                # prepare edge capacities (default 2 per edge)
+                edge_capacity = {eid: 2 for eid in graph['edges'].keys()}
+
                 if vehicle_paths and (run_now or True):
-                    qubo, index_map = build_qubo(vehicle_paths, path_costs, same_vehicle_penalty=8.0, overlap_penalty=4.0)
+                    qubo, index_map = build_qubo(vehicle_paths, path_costs, same_vehicle_penalty=8.0, overlap_penalty=4.0, edge_capacity=edge_capacity)
                     res = solver.sample_qubo(qubo, num_reads=50)
                     sample = res.get('sample', {})
                     # map back chosen paths
@@ -168,13 +177,33 @@ async def main_async():
                     chosen_single = {vid: paths[0] if isinstance(paths, list) and len(paths) > 0 else None for vid, paths in chosen.items()}
                     # convert to polyline index lists
                     chosen_polylines = {}
+                    optimized_total = 0.0
+                    baseline_total = 0.0
+                    # baseline: take first candidate cost per vehicle
+                    for vid, cand_list in vehicle_paths.items():
+                        if (vid, 0) in path_costs:
+                            baseline_total += path_costs[(vid, 0)]
+
                     for vid, pidx in chosen_single.items():
                         if pidx is None:
                             continue
-                        pl_idx = vehicle_paths[vid][pidx]
+                        # chosen path as edge ids
+                        edge_path = vehicle_paths[vid][pidx]
+                        # convert to polyline sequence for display
+                        # choose corresponding display candidate if sizes match
+                        disp_seq = vehicle_display.get(vid, [])
+                        pl_idx = None
+                        if pidx < len(disp_seq):
+                            pl_idx = disp_seq[pidx]
+                        else:
+                            # fallback map edges to poly idxs
+                            pl_idx = [graph['edges'][eid]['poly_idx'] for eid in edge_path]
                         chosen_polylines[vid] = pl_idx
+                        # accumulate optimized cost
+                        optimized_total += sum(graph['edges'][eid]['weight'] for eid in edge_path)
 
                     app_state['optimised_routes'] = chosen_polylines
+                    app_state['metrics'] = {'baseline_total': baseline_total, 'optimized_total': optimized_total}
             except Exception as e:
                 print('Optimiser error:', e)
             await asyncio.sleep(5.0)

@@ -17,7 +17,7 @@ def round_coord(x, y, prec=6):
 def build_graph_from_map(map_data):
     nodes = {}
     node_list = []
-    edges = {}  # edge_id -> {from,to,weight,poly_idx}
+    edges = {}  # edge_id -> {from,to,weight,poly_idx,seg_idx}
     adj = {}
 
     def ensure_node(coord):
@@ -29,29 +29,26 @@ def build_graph_from_map(map_data):
         adj[idx] = []
         return idx
 
+    # Build segment-level graph: split each polyline into segments between consecutive points
     for pi, pl in enumerate(map_data.get('polylines', [])):
         pts = pl.get('points', [])
         if len(pts) < 2:
             continue
-        start = round_coord(pts[0]['nx'], pts[0]['ny'])
-        end = round_coord(pts[-1]['nx'], pts[-1]['ny'])
-        u = ensure_node(start)
-        v = ensure_node(end)
-        # compute length along polyline
-        length = 0.0
-        for i in range(len(pts) - 1):
-            x1, y1 = pts[i]['nx'], pts[i]['ny']
-            x2, y2 = pts[i+1]['nx'], pts[i+1]['ny']
-            dx = x2 - x1
-            dy = y2 - y1
-            length += math.hypot(dx, dy)
-        eid = len(edges)
-        edges[eid] = {'from': u, 'to': v, 'weight': length, 'poly_idx': pi}
-        adj[u].append(eid)
-        # also add reverse edge to allow two-way travel
-        rid = len(edges)
-        edges[rid] = {'from': v, 'to': u, 'weight': length, 'poly_idx': pi}
-        adj[v].append(rid)
+        for si in range(len(pts) - 1):
+            a = round_coord(pts[si]['nx'], pts[si]['ny'])
+            b = round_coord(pts[si+1]['nx'], pts[si+1]['ny'])
+            u = ensure_node(a)
+            v = ensure_node(b)
+            x1, y1 = pts[si]['nx'], pts[si]['ny']
+            x2, y2 = pts[si+1]['nx'], pts[si+1]['ny']
+            length = math.hypot(x2 - x1, y2 - y1)
+            eid = len(edges)
+            edges[eid] = {'from': u, 'to': v, 'weight': length, 'poly_idx': pi, 'seg_idx': si}
+            adj[u].append(eid)
+            # reverse direction
+            rid = len(edges)
+            edges[rid] = {'from': v, 'to': u, 'weight': length, 'poly_idx': pi, 'seg_idx': si}
+            adj[v].append(rid)
 
     graph = {'nodes': node_list, 'nodes_map': nodes, 'edges': edges, 'adj': adj}
     return graph

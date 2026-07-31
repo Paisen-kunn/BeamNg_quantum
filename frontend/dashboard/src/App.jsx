@@ -53,6 +53,7 @@ export default function App() {
 
   const [vehicles, setVehicles] = useState({});
   const [optimisedRoutes, setOptimisedRoutes] = useState({});
+  const [metrics, setMetrics] = useState({});
   const [viewMode, setViewMode] = useState('full'); // 'full' or 'minimap'
 
   const wsRef = useRef(null);
@@ -75,6 +76,9 @@ export default function App() {
             if (data.optimised_routes) {
               setOptimisedRoutes(data.optimised_routes);
             }
+              if (data.metrics) {
+                setMetrics(data.metrics);
+              }
           }
         } catch (e) {
           console.warn('Invalid WS message', e);
@@ -130,6 +134,14 @@ export default function App() {
           backgroundColor: '#fbfdff',
         }}
       >
+        {/* compare panel */}
+        <div style={{ position: 'absolute', left: 16, top: 16, background: '#ffffffcc', padding: 8, borderRadius: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.12)' }}>
+          <div style={{ fontSize: 12, color: '#374151' }}>Baseline total: {metrics?.baseline_total ? metrics.baseline_total.toFixed(2) : '—'}</div>
+          <div style={{ fontSize: 12, color: '#063970' }}>Optimized total: {metrics?.optimized_total ? metrics.optimized_total.toFixed(2) : '—'}</div>
+          {metrics?.baseline_total && metrics?.optimized_total && (
+            <div style={{ fontSize: 12, color: '#065f46' }}>Reduction: {((1 - (metrics.optimized_total / metrics.baseline_total)) * 100).toFixed(1)}%</div>
+          )}
+        </div>
         <svg viewBox="0 0 1 1" preserveAspectRatio="xMidYMid meet" width={w} height={h}>
           {/* grid */}
           <defs>
