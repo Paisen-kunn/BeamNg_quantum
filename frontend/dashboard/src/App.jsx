@@ -55,10 +55,13 @@ export default function App() {
   const [optimisedRoutes, setOptimisedRoutes] = useState({});
   const [viewMode, setViewMode] = useState('full'); // 'full' or 'minimap'
 
+  const wsRef = useRef(null);
+
   useEffect(() => {
     let ws;
     try {
       ws = new WebSocket('ws://localhost:8765');
+      wsRef.current = ws;
       ws.onopen = () => console.log('Connected to live map server');
       ws.onmessage = (ev) => {
         try {
@@ -90,6 +93,12 @@ export default function App() {
     };
   }, []);
 
+  function requestOptimise() {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: 'optimize' }));
+  }
+
   // stroke width scales inversely with zoom so inner/core lines become thinner when zoomed in
   // Use much smaller base and minimum values so lines render thin like Google map roads
   const baseStroke = 0.0004; // viewBox units (reduced)
@@ -110,6 +119,7 @@ export default function App() {
         <button className="icon" onClick={() => setState(s => ({ ...s, scale: Math.max(s.scale / 1.25, 0.2) }))}>−</button>
         <button onClick={() => setViewMode('full')} style={{ marginLeft: 0, background: viewMode === 'full' ? '#e6eefc' : undefined }}>Full</button>
         <button onClick={() => setViewMode('minimap')} style={{ marginLeft: 0, background: viewMode === 'minimap' ? '#e6eefc' : undefined }}>Minimap</button>
+        <button onClick={requestOptimise} style={{ marginTop: 6, background: '#e6ffe6' }}>Optimize</button>
       </div>
       <div
         className="svg-wrapper"
