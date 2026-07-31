@@ -1,6 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import mapData from '../../assets/map_data.json';
 
+const PICK_DROP_ROUTE_COLOR = '#ec4899';
+const BEST_ROUTE_DARK_PINK = '#9d174d';
+
 export default function App() {
   const containerRef = useRef(null);
   const [state, setState] = useState({ scale: 1, tx: 0, ty: 0, dragging: false, lastX: 0, lastY: 0 });
@@ -301,6 +304,8 @@ export default function App() {
           <div style={{ fontSize: 12, color: '#15803d', marginTop: 4 }}>Source: {sourcePin ? `${sourcePin.nx.toFixed(3)}, ${sourcePin.ny.toFixed(3)}` : 'unset'}</div>
           <div style={{ fontSize: 12, color: '#b91c1c' }}>Destination: {destinationPin ? `${destinationPin.nx.toFixed(3)}, ${destinationPin.ny.toFixed(3)}` : 'unset'}</div>
           <div style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>Highlighted route: {manualRoute.length > 0 ? `${manualRoute.length} segments` : 'none yet'}</div>
+          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>Pick/Drop route: <span style={{ color: PICK_DROP_ROUTE_COLOR, fontWeight: 700 }}>pink</span></div>
+          <div style={{ fontSize: 11, color: '#6b7280' }}>Best route: <span style={{ color: BEST_ROUTE_DARK_PINK, fontWeight: 700 }}>dark pink</span></div>
         </div>
         {/* compare panel */}
         <div style={{ position: 'absolute', left: 16, top: 16, background: '#ffffffcc', padding: 8, borderRadius: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.12)' }}>
@@ -350,7 +355,7 @@ export default function App() {
             const pl = mapData.polylines[pli];
             if (!pl) return null;
             return (
-              <polyline key={`manual-${pli}`} points={pointsToStr(pl.points)} fill="none" stroke="#f97316" strokeWidth={Math.max(0.005, strokeWidth * 12)} strokeLinecap="round" strokeLinejoin="round" opacity={0.98} />
+              <polyline key={`manual-${pli}`} points={pointsToStr(pl.points)} fill="none" stroke={PICK_DROP_ROUTE_COLOR} strokeWidth={Math.max(0.005, strokeWidth * 12)} strokeLinecap="round" strokeLinejoin="round" opacity={0.98} />
             );
           })}
           {/* highlight optimised route for player if available */}
@@ -366,7 +371,7 @@ export default function App() {
               if (!pl) return null;
               const pts = pointsToStr(pl.points);
               return (
-                <polyline key={`opt-${pli}`} points={pts} fill="none" stroke="#16a34a" strokeWidth={Math.max(0.004, strokeWidth * 10)} strokeLinecap="round" strokeLinejoin="round" opacity={0.95} />
+                <polyline key={`opt-${pli}`} points={pts} fill="none" stroke={BEST_ROUTE_DARK_PINK} strokeWidth={Math.max(0.004, strokeWidth * 10)} strokeLinecap="round" strokeLinejoin="round" opacity={0.98} />
               );
             });
           })()}
