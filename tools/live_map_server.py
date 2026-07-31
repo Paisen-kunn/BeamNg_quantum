@@ -66,7 +66,7 @@ async def main_async():
         map_data = json.load(f)
 
     # shared state for optimiser -> websocket handlers
-    app_state = {'optimised_routes': {}}
+    app_state = {'optimised_routes': {}, 'qubo': {}}
 
     # build graph from map data once
     from tools.quantum.graph import build_graph_from_map, nearest_node_for_coord
@@ -163,6 +163,19 @@ async def main_async():
 
                 if vehicle_paths and (run_now or True):
                     qubo, index_map = build_qubo(vehicle_paths, path_costs, same_vehicle_penalty=8.0, overlap_penalty=4.0, edge_capacity=edge_capacity)
+                    # build dense matrix representation and labels for client visualisation
+                    try:
+                        N = max(index_map.keys()) + 1 if index_map else 0
+                    except Exception:
+                        N = len(index_map)
+                    qubo_matrix = [[0.0 for _ in range(N)] for __ in range(N)]
+                    for (i, j), w in qubo.items():
+                        if i <= j:
+                            qubo_matrix[i][j] = float(w)
+                            qubo_matrix[j][i] = float(w)
+                    # labels for rows/cols
+                    labels = [f"{index_map[i][0]}:{index_map[i][1]}" for i in range(N)]
+                    app_state['qubo'] = {'matrix': qubo_matrix, 'labels': labels}
                     res = solver.sample_qubo(qubo, num_reads=50)
                     sample = res.get('sample', {})
                     # map back chosen paths
