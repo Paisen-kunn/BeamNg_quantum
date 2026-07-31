@@ -393,8 +393,20 @@ export default function App() {
 
             return (
               <g>
-                {sourcePin && <circle cx={sourcePin.nx} cy={sourcePin.ny} r={0.012 / state.scale} fill="#2563eb" stroke="#fff" strokeWidth={0.001} />}
-                {destinationPin && <circle cx={destinationPin.nx} cy={destinationPin.ny} r={0.012 / state.scale} fill="#ef4444" stroke="#fff" strokeWidth={0.001} />}
+                {sourcePin && (
+                  <g>
+                    <circle cx={sourcePin.nx} cy={sourcePin.ny} r={0.018 / state.scale} fill="#16a34a" stroke="#ffffff" strokeWidth={0.002} />
+                    <circle cx={sourcePin.nx} cy={sourcePin.ny} r={0.006 / state.scale} fill="#dcfce7" stroke="none" />
+                    <text x={sourcePin.nx + 0.008} y={sourcePin.ny - 0.008} fontSize={0.018 / state.scale} fill="#166534" stroke="#ffffff" strokeWidth={0.0008} paintOrder="stroke">S</text>
+                  </g>
+                )}
+                {destinationPin && (
+                  <g>
+                    <circle cx={destinationPin.nx} cy={destinationPin.ny} r={0.018 / state.scale} fill="#dc2626" stroke="#ffffff" strokeWidth={0.002} />
+                    <circle cx={destinationPin.nx} cy={destinationPin.ny} r={0.006 / state.scale} fill="#fee2e2" stroke="none" />
+                    <text x={destinationPin.nx + 0.008} y={destinationPin.ny - 0.008} fontSize={0.018 / state.scale} fill="#991b1b" stroke="#ffffff" strokeWidth={0.0008} paintOrder="stroke">D</text>
+                  </g>
+                )}
                 {/* other vehicles as small dots */}
                 {others.map((v) => (
                   <circle key={v.id} cx={v.nx} cy={v.ny} r={0.009 / state.scale} fill="rgba(220,38,38,0.95)" stroke="#fff" strokeWidth={0.0008} />
