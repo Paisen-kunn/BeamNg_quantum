@@ -55,7 +55,6 @@ export default function App() {
   const [optimisedRoutes, setOptimisedRoutes] = useState({});
   const [metrics, setMetrics] = useState({});
   const [quboData, setQuboData] = useState(null);
-  const [ecomData, setEcomData] = useState(null);
   const [following, setFollowing] = useState(false);
   const [followPos, setFollowPos] = useState(null); // {nx, ny}
   const [viewMode, setViewMode] = useState('full'); // 'full' or 'minimap'
@@ -100,9 +99,6 @@ export default function App() {
             }
             if (data.qubo) {
               setQuboData(data.qubo);
-            }
-            if (data.ecom) {
-              setEcomData(data.ecom);
             }
           } else if (data.type === 'opt_ack') {
             console.log('Server acked optimize request');
@@ -327,55 +323,7 @@ export default function App() {
             );
           })()}
         </svg>
-        {/* Ecommerce right panel */}
-        {ecomData && (
-          <div style={{ position: 'absolute', right: 16, top: 16, width: 420, height: Math.min(720, h - 48), background: '#fff', borderRadius: 12, boxShadow: '0 8px 30px rgba(2,6,23,0.08)', padding: 16, overflow: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>E‑commerce Dashboard</div>
-              <div style={{ fontSize: 12, color: '#6b7280' }}>Live</div>
-            </div>
-            <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-              <div style={{ flex: 1, background: '#f8fafc', borderRadius: 8, padding: 10 }}>
-                <div style={{ fontSize: 12, color: '#6b7280' }}>Revenue</div>
-                <div style={{ fontSize: 20, fontWeight: 700 }}>${ecomData.revenue?.toLocaleString() ?? '—'}</div>
-              </div>
-              <div style={{ flex: 1, background: '#f8fafc', borderRadius: 8, padding: 10 }}>
-                <div style={{ fontSize: 12, color: '#6b7280' }}>Orders</div>
-                <div style={{ fontSize: 20, fontWeight: 700 }}>{ecomData.orders ?? '—'}</div>
-              </div>
-              <div style={{ flex: 1, background: '#f8fafc', borderRadius: 8, padding: 10 }}>
-                <div style={{ fontSize: 12, color: '#6b7280' }}>Conversion</div>
-                <div style={{ fontSize: 20, fontWeight: 700 }}>{((ecomData.conversion || 0) * 100).toFixed(2)}%</div>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Top Products</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px', gap: 8 }}>
-                {Array.isArray(ecomData.top_products) ? ecomData.top_products.map((p) => (
-                  <React.Fragment key={p.id}>
-                    <div style={{ fontSize: 13 }}>{p.name}</div>
-                    <div style={{ textAlign: 'right', color: '#0ea5a4', fontWeight: 700 }}>{p.sales}</div>
-                  </React.Fragment>
-                )) : null}
-              </div>
-            </div>
-
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Inventory</div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <tbody>
-                  {ecomData.inventory && Object.entries(ecomData.inventory).map(([pid, qty]) => (
-                    <tr key={pid} style={{ borderTop: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '8px 6px' }}>{pid}</td>
-                      <td style={{ padding: '8px 6px', textAlign: 'right' }}>{qty}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        
         {/* minimap overlay when requested */}
         {viewMode === 'minimap' && (() => {
           const ids = Object.keys(vehicles);

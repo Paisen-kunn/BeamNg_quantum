@@ -37,7 +37,7 @@ async def broadcast_positions(websocket, path, controller, vehicle_manager, boun
             opt = websocket.app_state.get('optimised_routes') if hasattr(websocket, 'app_state') else None
             metrics = websocket.app_state.get('metrics') if hasattr(websocket, 'app_state') else None
             qubo = websocket.app_state.get('qubo') if hasattr(websocket, 'app_state') else None
-            payload = json.dumps({'type': 'positions', 'vehicles': msgs, 'optimised_routes': opt or {}, 'metrics': metrics or {}, 'qubo': qubo or {}, 'ecom': websocket.app_state.get('ecom') or {}})
+            payload = json.dumps({'type': 'positions', 'vehicles': msgs, 'optimised_routes': opt or {}, 'metrics': metrics or {}, 'qubo': qubo or {}})
             await websocket.send(payload)
             await asyncio.sleep(0.2)
     except websockets.exceptions.ConnectionClosed:
@@ -67,7 +67,7 @@ async def main_async():
         map_data = json.load(f)
 
     # shared state for optimiser -> websocket handlers
-    app_state = {'optimised_routes': {}, 'qubo': {}, 'ecom': {}}
+    app_state = {'optimised_routes': {}, 'qubo': {}}
 
     # build graph from map data once
     from tools.quantum.graph import build_graph_from_map, nearest_node_for_coord
@@ -218,19 +218,7 @@ async def main_async():
 
                     app_state['optimised_routes'] = chosen_polylines
                     app_state['metrics'] = {'baseline_total': baseline_total, 'optimized_total': optimized_total}
-                    # derive simple ecommerce-like metrics for dashboard demo
-                    try:
-                        import random
-                        revenue = round(max(0.0, 1000.0 * (1.0 - (optimized_total / max(1e-6, baseline_total)))), 2)
-                        orders = int(10 + random.random() * 50)
-                        conversion = round(min(0.5, 0.02 + (optimized_total / max(1e-6, baseline_total)) * 0.1), 4)
-                        top_products = [
-                            {'id': f'prod{i}', 'name': f'Product {i}', 'sales': int(50 - i * 3 + random.random() * 10)} for i in range(1,6)
-                        ]
-                        inventory = {f'prod{i}': max(0, 100 - i*7) for i in range(1,6)}
-                        app_state['ecom'] = {'revenue': revenue, 'orders': orders, 'conversion': conversion, 'top_products': top_products, 'inventory': inventory}
-                    except Exception:
-                        app_state['ecom'] = {}
+                    pass
                     try:
                         print('Optimiser produced routes:', json.dumps({'routes': chosen_polylines, 'metrics': app_state['metrics']}))
                     except Exception:
